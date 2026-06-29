@@ -2,7 +2,7 @@
 
 ## Concept
 
-Couple Flow is a playful weekly planning board for a couple. It combines a shared activity pool, budget groups, weekly draw, ban slots, scheduled to-dos, and true history after outcomes.
+Couple Flow is a playful weekly planning board for a couple. It combines a shared activity pool, budget groups, weekly draw, per-member activity vetoes, scheduled to-dos, and true history after outcomes.
 
 The product should feel calm and premium, but warm. It borrows:
 
@@ -16,14 +16,14 @@ It should not feel like an enterprise dashboard.
 ## Personas
 
 - Partner A and Partner B share one pair space.
-- Each partner can add activities, ban unavailable time slots, agree to draw/replacement/redraw decisions, and record outcomes.
+- Each partner can add activities, ban up to two activities for a draw session, agree to replacement/redraw decisions, and record outcomes.
 
 ## Core Objects
 
 - Pair: the shared space, timezone, and members.
 - Activity: an idea in the shared pool.
 - Budget group: a loose spending or effort band.
-- Ban slot: a time window that should not be planned.
+- Weekly activity ban: a member veto that prevents an activity from appearing in a draw session.
 - Draw session: the act of selecting one or more activities for a target week.
 - Scheduled session: an accepted activity planned for a specific week.
 - Outcome: the only source of history.
@@ -55,7 +55,7 @@ History is created only when a scheduled session receives one of these outcomes:
 
 ### Week Board
 
-Shows the current week, ongoing sessions, future planning, ban slots, and scheduled to-dos.
+Shows the current week, ongoing sessions, future planning, and scheduled to-dos. Unavailable-time slots stay out of V0.
 
 ### Activity Pool
 
@@ -80,3 +80,4 @@ Shows pair name, timezone, members, mock mode status, and defaults.
 - Payments
 - Push notifications
 - Production Supabase auth flow
+- Unavailable-time scheduling

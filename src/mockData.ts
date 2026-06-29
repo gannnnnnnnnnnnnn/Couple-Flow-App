@@ -1,13 +1,12 @@
 import type {
   Activity,
-  BanSlot,
   BudgetGroup,
-  DrawCandidate,
   DrawSession,
   Pair,
   PairMember,
   ScheduledSession,
   SessionOutcome,
+  WeeklyActivityBan,
 } from './types';
 
 export const pair: Pair = {
@@ -108,6 +107,30 @@ export const activities: Activity[] = [
     created_at: '2026-06-05T00:00:00.000Z',
   },
   {
+    id: 'activity-arcade',
+    pair_id: pair.id,
+    title: 'Arcade duel night',
+    note: 'Ten tokens each, winner chooses dessert.',
+    budget_group_id: 'budget-treat',
+    duration_minutes: 105,
+    tags: ['games', 'inside'],
+    created_by_member_id: 'member-g',
+    status: 'active',
+    created_at: '2026-06-07T00:00:00.000Z',
+  },
+  {
+    id: 'activity-bookshop',
+    pair_id: pair.id,
+    title: 'Bookshop swap',
+    note: 'Pick one tiny book for each other.',
+    budget_group_id: 'budget-tiny',
+    duration_minutes: 60,
+    tags: ['quiet', 'inside'],
+    created_by_member_id: 'member-l',
+    status: 'active',
+    created_at: '2026-06-08T00:00:00.000Z',
+  },
+  {
     id: 'activity-karaoke',
     pair_id: pair.id,
     title: 'Karaoke room',
@@ -121,28 +144,9 @@ export const activities: Activity[] = [
   },
 ];
 
-export const banSlots: BanSlot[] = [
-  {
-    id: 'ban-late-meeting',
-    pair_id: pair.id,
-    member_id: 'member-g',
-    starts_at: '2026-06-30T08:30:00.000Z',
-    ends_at: '2026-06-30T11:00:00.000Z',
-    reason: 'late meeting',
-  },
-  {
-    id: 'ban-family-call',
-    pair_id: pair.id,
-    member_id: 'member-l',
-    starts_at: '2026-07-02T10:00:00.000Z',
-    ends_at: '2026-07-02T11:30:00.000Z',
-    reason: 'family call',
-  },
-];
-
 export const drawSessions: DrawSession[] = [
   {
-    id: 'draw-next-week',
+    id: 'draw-seed',
     pair_id: pair.id,
     target_week_start_date: '2026-07-06',
     created_by_member_id: 'member-g',
@@ -151,20 +155,14 @@ export const drawSessions: DrawSession[] = [
   },
 ];
 
-export const drawCandidates: DrawCandidate[] = [
+export const weeklyActivityBans: WeeklyActivityBan[] = [
   {
-    id: 'candidate-pottery',
-    draw_session_id: 'draw-next-week',
-    activity_id: 'activity-pottery',
-    position: 1,
-    selected: false,
-  },
-  {
-    id: 'candidate-sunrise',
-    draw_session_id: 'draw-next-week',
-    activity_id: 'activity-sunrise',
-    position: 2,
-    selected: false,
+    id: 'ban-seed-g-karaoke',
+    pair_id: pair.id,
+    draw_session_id: 'draw-seed',
+    member_id: 'member-g',
+    activity_id: 'activity-karaoke',
+    created_at: '2026-06-29T00:00:00.000Z',
   },
 ];
 
@@ -216,7 +214,7 @@ export const sessionOutcomes: SessionOutcome[] = [
     id: 'outcome-history',
     scheduled_session_id: 'session-history',
     outcome_type: 'completed',
-    rating: '再来一次',
+    rating: '顶级',
     reason: null,
     replacement_activity_id: null,
     agreed_by_member_ids: [],

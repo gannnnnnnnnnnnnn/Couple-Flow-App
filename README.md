@@ -2,7 +2,7 @@
 
 A playful weekly planning board for a couple.
 
-Couple Flow helps two people keep a shared pool of activity ideas, draw weekly plans, protect unavailable slots, schedule to-dos, and keep true history only after a real outcome.
+Couple Flow helps two people keep a shared pool of activity ideas, use per-draw activity vetoes, draw weekly plans, schedule to-dos, and keep true history only after a real outcome.
 
 ## V0 Scope
 
@@ -17,7 +17,7 @@ Couple Flow helps two people keep a shared pool of activity ideas, draw weekly p
   - History
   - Settings / Pair
 
-Out of scope for V0: photos, maps, payments, and push notifications.
+Out of scope for V0: photos, maps, payments, push notifications, unavailable-time scheduling, auth, and Supabase connection.
 
 ## Critical Product Rule
 

@@ -29,7 +29,7 @@ The UI should feel like a couple's planning ritual: warm, fast to scan, and slig
 - First screen after launch.
 - Shows This Week / Ongoing first.
 - Shows Planning below current week.
-- Uses a small timeline feel for ban slots and to-dos.
+- Uses a small weekly rhythm for ongoing plans, future plans, and to-dos.
 - Makes outcome actions visible only for current sessions.
 
 ### Activity Pool

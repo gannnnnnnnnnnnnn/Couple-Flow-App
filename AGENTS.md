@@ -29,7 +29,8 @@ After draw and accept, an activity becomes a scheduled session for a `target_wee
 - Vite + React + TypeScript + Tailwind
 - Mobile-first PWA
 - Supabase-ready model with local mock mode for UI development
-- No photos, maps, payments, or push notifications in V0
+- Per-member activity bans are draw-session vetoes, not unavailable time windows
+- No photos, maps, payments, push notifications, unavailable-time scheduling, or Supabase auth in V0
 
 ## Working Rules
 

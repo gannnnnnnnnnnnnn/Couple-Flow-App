@@ -1,4 +1,4 @@
-const dateFormatter = new Intl.DateTimeFormat('en-CA', {
+const utcDateFormatter = new Intl.DateTimeFormat('en-CA', {
   timeZone: 'UTC',
   year: 'numeric',
   month: '2-digit',
@@ -32,7 +32,21 @@ export function getWeekStartDate(date: Date, timeZone: string) {
   const mondayOffset = weekdayIndex === 0 ? -6 : 1 - weekdayIndex;
   const utcDate = new Date(Date.UTC(parts.year, parts.month - 1, parts.day));
   utcDate.setUTCDate(utcDate.getUTCDate() + mondayOffset);
-  return dateFormatter.format(utcDate);
+  return utcDateFormatter.format(utcDate);
+}
+
+export function addWeeks(weekStartDate: string, amount: number) {
+  const date = new Date(`${weekStartDate}T00:00:00.000Z`);
+  date.setUTCDate(date.getUTCDate() + amount * 7);
+  return utcDateFormatter.format(date);
+}
+
+export function getNextWeekStartDate(weekStartDate: string) {
+  return addWeeks(weekStartDate, 1);
+}
+
+export function getPreviousWeekStartDate(weekStartDate: string) {
+  return addWeeks(weekStartDate, -1);
 }
 
 export function formatWeekLabel(dateString: string) {
@@ -41,13 +55,4 @@ export function formatWeekLabel(dateString: string) {
     month: 'short',
     day: 'numeric',
   }).format(date);
-}
-
-export function formatDateTime(value: string, timeZone: string) {
-  return new Intl.DateTimeFormat('en-AU', {
-    timeZone,
-    weekday: 'short',
-    hour: 'numeric',
-    minute: '2-digit',
-  }).format(new Date(value));
 }

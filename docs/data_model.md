@@ -48,16 +48,18 @@ The V0 app uses local mock data, shaped to be Supabase-ready.
 | `status` | text | `active` or `paused` |
 | `created_at` | timestamptz | Created time |
 
-### ban_slots
+### weekly_activity_bans
 
 | Field | Type | Notes |
 | --- | --- | --- |
 | `id` | uuid | Primary key |
 | `pair_id` | uuid | References `pairs.id` |
-| `member_id` | uuid | Optional owner |
-| `starts_at` | timestamptz | Start |
-| `ends_at` | timestamptz | End |
-| `reason` | text | Optional label |
+| `draw_session_id` | uuid | References `draw_sessions.id` |
+| `member_id` | uuid | References `pair_members.id` |
+| `activity_id` | uuid | References `activities.id` |
+| `created_at` | timestamptz | Created time |
+
+Each member may create up to two `weekly_activity_bans` per draw session in V0. These are activity vetoes only. Unavailable time windows are out of V0 scope.
 
 ### draw_sessions
 

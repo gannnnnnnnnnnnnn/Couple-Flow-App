@@ -24,6 +24,7 @@
 - [x] Pair timezone defaults to `Australia/Melbourne`.
 - [x] Week storage uses `target_week_start_date`, not week numbers.
 - [x] Replacement/redraw outcomes include both-member agreement.
+- [x] V0 uses per-member activity bans instead of unavailable time windows.
 
 ## Validation
 

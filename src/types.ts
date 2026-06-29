@@ -8,7 +8,9 @@ export type SessionStatus =
 
 export type OutcomeType = 'completed' | 'not_done' | 'replaced' | 'redrawn';
 
-export type Rating = '夯' | '还行' | '拉' | '再来一次' | '不想再做';
+export type Rating = '夯' | '顶级' | '人上人' | 'NPC' | '拉完了';
+
+export type BudgetFilter = 'all' | string;
 
 export interface Pair {
   id: string;
@@ -46,15 +48,6 @@ export interface Activity {
   created_at: string;
 }
 
-export interface BanSlot {
-  id: string;
-  pair_id: string;
-  member_id: string | null;
-  starts_at: string;
-  ends_at: string;
-  reason: string;
-}
-
 export interface DrawSession {
   id: string;
   pair_id: string;
@@ -64,12 +57,13 @@ export interface DrawSession {
   created_at: string;
 }
 
-export interface DrawCandidate {
+export interface WeeklyActivityBan {
   id: string;
   draw_session_id: string;
+  pair_id: string;
+  member_id: string;
   activity_id: string;
-  position: number;
-  selected: boolean;
+  created_at: string;
 }
 
 export interface ScheduledSession {

@@ -29,3 +29,24 @@ select:focus-visible {
   outline: 3px solid rgba(249, 115, 98, 0.5);
   outline-offset: 3px;
 }
+
+@keyframes draw-shuffle {
+  0% {
+    transform: translateY(0) rotate(0deg);
+    opacity: 0.75;
+  }
+  35% {
+    transform: translateY(-8px) rotate(1.5deg);
+    opacity: 1;
+  }
+  70% {
+    transform: translateY(5px) rotate(-1.5deg);
+  }
+  100% {
+    transform: translateY(0) rotate(0deg);
+  }
+}
+
+.animate-draw-shuffle {
+  animation: draw-shuffle 520ms ease-in-out;
+}
