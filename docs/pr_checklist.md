@@ -19,6 +19,10 @@
 - [x] Settings / Pair exists.
 - [x] Local-first persistence exists before Supabase.
 - [x] Optional Supabase pair-code sync exists without requiring env vars for demo mode.
+- [x] Settings disables demo reset and backup import while connected to a pair.
+- [x] Settings disconnect clears local device data without remote deletes.
+- [x] Activity Pool supports faster mobile quick-add entry.
+- [x] JSON backup export/import exists for local mode with shape validation.
 - [x] No photos, maps, payments, or push notifications.
 
 ## Data Model
