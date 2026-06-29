@@ -36,7 +36,7 @@ After draw and accept, the activity is a scheduled plan for `target_week_start_d
 
 History is created only when a scheduled session receives one of these outcomes:
 
-- Completed with rating: `夯`, `还行`, `拉`, `再来一次`, `不想再做`
+- Completed with rating: `夯`, `顶级`, `人上人`, `NPC`, `拉完了`
 - Not done with a reason
 - Manually replaced with both members agreeing
 - Redrawn with both members agreeing
@@ -49,6 +49,7 @@ History is created only when a scheduled session receives one of these outcomes:
 - Compute current week from pair timezone.
 - Future sessions show under Planning.
 - Current week sessions show under This Week / Ongoing.
+- Past open sessions with no outcome show under Needs Review / Overdue.
 - Archived outcomes show under History.
 
 ## V0 Screens

@@ -52,6 +52,11 @@ export function DrawScreen({
 }) {
   const [revealing, setRevealing] = useState(false);
   const drawSessionId = `draw-${targetWeekStart}`;
+  const bannableActivities = activities.filter(
+    (activity) =>
+      activity.status === 'active' &&
+      (budgetFilter === 'all' || activity.budget_group_id === budgetFilter),
+  );
   const eligibleActivities = getEligibleActivities({
     activities,
     budgetGroupId: budgetFilter,
@@ -118,8 +123,11 @@ export function DrawScreen({
         {members.map((member) => (
           <BanPanel
             key={member.id}
-            activities={activities.filter((activity) => activity.status === 'active')}
+            activities={bannableActivities}
             bans={bans}
+            budgetLabel={
+              budgetFilter === 'all' ? 'all budgets' : budgetById.get(budgetFilter)?.name ?? 'budget'
+            }
             drawSessionId={drawSessionId}
             member={member}
             onToggleBan={onToggleBan}
@@ -184,12 +192,14 @@ export function DrawScreen({
 function BanPanel({
   activities,
   bans,
+  budgetLabel,
   drawSessionId,
   member,
   onToggleBan,
 }: {
   activities: Activity[];
   bans: WeeklyActivityBan[];
+  budgetLabel: string;
   drawSessionId: string;
   member: PairMember;
   onToggleBan: (memberId: string, activityId: string) => void;
@@ -201,10 +211,18 @@ function BanPanel({
   return (
     <div className="rounded-md bg-white/80 p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
-        <p className="font-black text-ink">{member.display_name}'s bans</p>
+        <div>
+          <p className="font-black text-ink">{member.display_name}'s current-draw bans</p>
+          <p className="text-xs font-semibold text-ink/50">{budgetLabel}</p>
+        </div>
         <Chip tone={memberBans.length === 2 ? 'coral' : 'butter'}>{memberBans.length}/2</Chip>
       </div>
       <div className="grid gap-2">
+        {activities.length === 0 && (
+          <p className="rounded-md bg-cream px-3 py-3 text-sm font-semibold text-ink/55">
+            No active activities in this budget.
+          </p>
+        )}
         {activities.map((activity) => {
           const isBanned = memberBans.some((ban) => ban.activity_id === activity.id);
           const disabled = !isBanned && memberBans.length >= 2;

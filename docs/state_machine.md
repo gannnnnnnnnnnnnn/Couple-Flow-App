@@ -17,10 +17,16 @@ stateDiagram-v2
   Scheduled --> Ongoing: target week is current week
   Scheduled --> Planning: target week is future week
   Planning --> Ongoing: week arrives
+  Ongoing --> NeedsReview: week passes without outcome
+  Scheduled --> NeedsReview: target week is before current week and no outcome exists
   Ongoing --> Completed: completed + rating
   Ongoing --> NotDone: not done + reason
   Ongoing --> Replaced: both agreed replacement
   Ongoing --> Redrawn: both agreed redraw
+  NeedsReview --> Completed: completed + rating
+  NeedsReview --> NotDone: not done + reason
+  NeedsReview --> Replaced: both agreed replacement
+  NeedsReview --> Redrawn: both agreed redraw
   Completed --> History
   NotDone --> History
   Replaced --> History
@@ -33,6 +39,7 @@ stateDiagram-v2
 | --- | --- | --- |
 | `planning` | Accepted for a future target week | No |
 | `ongoing` | Target week is current week | No |
+| `needs_review` | Target week is before current week and no outcome exists | No |
 | `completed` | Done with a simple rating | Yes |
 | `not_done` | Missed with a reason | Yes |
 | `replaced` | Manually replaced with both members agreeing | Yes |
@@ -43,10 +50,10 @@ stateDiagram-v2
 Completed sessions use one simple rating:
 
 - `夯`
-- `还行`
-- `拉`
-- `再来一次`
-- `不想再做`
+- `顶级`
+- `人上人`
+- `NPC`
+- `拉完了`
 
 ## Agreement Rules
 
@@ -58,6 +65,7 @@ For a pair timezone:
 
 - If `target_week_start_date` is after the current week start, show under Planning.
 - If `target_week_start_date` equals the current week start and no outcome exists, show under This Week / Ongoing.
+- If `target_week_start_date` is before the current week start and no outcome exists, show under Needs Review / Overdue.
 - If an outcome exists, show under History regardless of target date.
 
 ## Forbidden Transitions

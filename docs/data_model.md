@@ -114,6 +114,7 @@ Local mock mode should expose the same object names and field names as the Supab
 
 ## Derived Views
 
-- Planning: scheduled sessions with no outcome and future `target_week_start_date`.
+- Needs Review / Overdue: scheduled sessions with no outcome and past `target_week_start_date`.
 - This Week / Ongoing: scheduled sessions with no outcome and current `target_week_start_date`.
+- Planning: scheduled sessions with no outcome and future `target_week_start_date`.
 - History: sessions with a `session_outcomes` record.

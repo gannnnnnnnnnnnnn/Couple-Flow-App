@@ -1,6 +1,7 @@
 export type SessionStatus =
   | 'planning'
   | 'ongoing'
+  | 'needs_review'
   | 'completed'
   | 'not_done'
   | 'replaced'

@@ -26,6 +26,9 @@ export function classifySessions(
   const openSessions = sessions.filter((session) => !outcomeBySessionId.has(session.id));
 
   return {
+    needsReviewSessions: openSessions.filter(
+      (session) => session.target_week_start_date < currentWeekStart,
+    ),
     ongoingSessions: openSessions.filter(
       (session) => session.target_week_start_date === currentWeekStart,
     ),
@@ -49,7 +52,12 @@ export function createScheduledSession(
     activity_id: activity.id,
     draw_session_id: drawSessionId,
     target_week_start_date: targetWeekStartDate,
-    status: targetWeekStartDate === currentWeekStart ? 'ongoing' : 'planning',
+    status:
+      targetWeekStartDate < currentWeekStart
+        ? 'needs_review'
+        : targetWeekStartDate === currentWeekStart
+          ? 'ongoing'
+          : 'planning',
     todo_text: 'Pick a time together',
     created_at: new Date().toISOString(),
   };

@@ -4,10 +4,12 @@ import { pair } from '../mockData';
 
 export function SettingsScreen({
   currentWeekStart,
+  needsReviewCount,
   ongoingCount,
   planningCount,
 }: {
   currentWeekStart: string;
+  needsReviewCount: number;
   ongoingCount: number;
   planningCount: number;
 }) {
@@ -21,7 +23,11 @@ export function SettingsScreen({
         <InfoRow icon={Heart} label="Pair" value={pair.name} />
         <InfoRow icon={Clock3} label="Timezone" value={pair.timezone} />
         <InfoRow icon={CalendarDays} label="Current week" value={currentWeekStart} />
-        <InfoRow icon={Check} label="Open plans" value={`${ongoingCount + planningCount}`} />
+        <InfoRow
+          icon={Check}
+          label="Open plans"
+          value={`${needsReviewCount + ongoingCount + planningCount}`}
+        />
       </div>
     </section>
   );

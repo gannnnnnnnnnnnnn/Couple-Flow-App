@@ -7,6 +7,7 @@
 - [x] Current week is computed from pair timezone.
 - [x] Future sessions render under Planning.
 - [x] Current week sessions render under This Week / Ongoing.
+- [x] Past open sessions render under Needs Review / Overdue.
 - [x] History contains only sessions with outcomes.
 
 ## V0 Scope

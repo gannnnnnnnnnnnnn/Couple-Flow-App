@@ -188,6 +188,16 @@ export const scheduledSessions: ScheduledSession[] = [
     created_at: '2026-06-23T00:00:00.000Z',
   },
   {
+    id: 'session-needs-review',
+    pair_id: pair.id,
+    activity_id: 'activity-arcade',
+    draw_session_id: null,
+    target_week_start_date: '2026-06-22',
+    status: 'needs_review',
+    todo_text: 'Decide if arcade night happened',
+    created_at: '2026-06-17T00:00:00.000Z',
+  },
+  {
     id: 'session-history',
     pair_id: pair.id,
     activity_id: 'activity-sunrise',

@@ -13,6 +13,7 @@ export function WeekBoard({
   budgetById,
   currentWeekStart,
   members,
+  needsReviewSessions,
   ongoingSessions,
   planningSessions,
   onComplete,
@@ -26,6 +27,7 @@ export function WeekBoard({
   budgetById: Map<string, BudgetGroup>;
   currentWeekStart: string;
   members: PairMember[];
+  needsReviewSessions: ScheduledSession[];
   ongoingSessions: ScheduledSession[];
   planningSessions: ScheduledSession[];
   onComplete: (session: ScheduledSession, rating: Rating) => void;
@@ -34,7 +36,8 @@ export function WeekBoard({
   onRedraw: (session: ScheduledSession) => void;
   onNavigate: (screen: Screen) => void;
 }) {
-  const openPlanCount = ongoingSessions.length + planningSessions.length;
+  const openPlanCount =
+    needsReviewSessions.length + ongoingSessions.length + planningSessions.length;
 
   return (
     <section className="space-y-5">
@@ -81,6 +84,34 @@ export function WeekBoard({
               onNotDone={onNotDone}
               onReplace={onReplace}
               onRedraw={onRedraw}
+              stateLabel="This Week"
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <SectionTitle title="Needs Review" count={needsReviewSessions.length} />
+        <div className="mt-3 space-y-3">
+          {needsReviewSessions.length === 0 && (
+            <EmptyState
+              title="Nothing overdue"
+              body="Past plans with no outcome will wait here until you review them together."
+            />
+          )}
+          {needsReviewSessions.map((session) => (
+            <OngoingCard
+              key={session.id}
+              activity={activityById.get(session.activity_id)!}
+              activities={activities}
+              budgetById={budgetById}
+              members={members}
+              session={session}
+              onComplete={onComplete}
+              onNotDone={onNotDone}
+              onReplace={onReplace}
+              onRedraw={onRedraw}
+              stateLabel="Needs Review"
             />
           ))}
         </div>
@@ -128,6 +159,7 @@ function OngoingCard({
   onNotDone,
   onReplace,
   onRedraw,
+  stateLabel,
 }: {
   activity: Activity;
   activities: Activity[];
@@ -138,6 +170,7 @@ function OngoingCard({
   onNotDone: (session: ScheduledSession, reason: string) => void;
   onReplace: (session: ScheduledSession, replacementActivityId: string) => void;
   onRedraw: (session: ScheduledSession) => void;
+  stateLabel: 'This Week' | 'Needs Review';
 }) {
   const [mode, setMode] = useState<'idle' | 'done' | 'missed' | 'replace' | 'redraw'>('idle');
   const [reason, setReason] = useState('');
@@ -163,12 +196,18 @@ function OngoingCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-clay">
-            Week {formatWeekLabel(session.target_week_start_date)}
+            {stateLabel} · Week {formatWeekLabel(session.target_week_start_date)}
           </p>
           <h3 className="mt-1 text-lg font-bold text-ink">{activity.title}</h3>
-          <p className="mt-1 text-sm text-ink/60">{session.todo_text}</p>
+          <p className="mt-1 text-sm text-ink/60">
+            {stateLabel === 'Needs Review'
+              ? 'This plan is overdue. Choose what happened before it becomes history.'
+              : session.todo_text}
+          </p>
         </div>
-        <Chip tone="coral">{budgetById.get(activity.budget_group_id)?.name ?? 'open'}</Chip>
+        <Chip tone={stateLabel === 'Needs Review' ? 'butter' : 'coral'}>
+          {budgetById.get(activity.budget_group_id)?.name ?? 'open'}
+        </Chip>
       </div>
 
       <div className="mt-4 grid grid-cols-4 gap-2">

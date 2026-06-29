@@ -6,7 +6,12 @@ import { PoolScreen } from './components/PoolScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { WeekBoard } from './components/WeekBoard';
 import type { Screen } from './components/common';
-import { getOutcomeBySessionId, classifySessions, createOutcome, createScheduledSession } from './domain/state';
+import {
+  classifySessions,
+  createOutcome,
+  createScheduledSession,
+  getOutcomeBySessionId,
+} from './domain/state';
 import { getNextWeekStartDate, getWeekStartDate } from './domain/week';
 import {
   activities as mockActivities,
@@ -57,7 +62,7 @@ function App() {
     [],
   );
   const outcomeBySessionId = useMemo(() => getOutcomeBySessionId(outcomes), [outcomes]);
-  const { ongoingSessions, planningSessions, historySessions } = useMemo(
+  const { needsReviewSessions, ongoingSessions, planningSessions, historySessions } = useMemo(
     () => classifySessions(scheduledSessions, outcomes, currentWeekStart),
     [currentWeekStart, outcomes, scheduledSessions],
   );
@@ -120,7 +125,7 @@ function App() {
     );
 
     setScheduledSessions((sessions) => [...sessions, session]);
-    setDrawResults((results) => results.filter((result) => result.id !== activity.id));
+    setDrawResults([]);
     setActiveScreen('board');
   }
 
@@ -198,6 +203,7 @@ function App() {
           budgetById={budgetById}
           currentWeekStart={currentWeekStart}
           members={members}
+          needsReviewSessions={needsReviewSessions}
           ongoingSessions={ongoingSessions}
           planningSessions={planningSessions}
           onComplete={completeSession}
@@ -249,6 +255,7 @@ function App() {
           currentWeekStart={currentWeekStart}
           ongoingCount={ongoingSessions.length}
           planningCount={planningSessions.length}
+          needsReviewCount={needsReviewSessions.length}
         />
       )}
     </AppShell>

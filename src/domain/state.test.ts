@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity, ScheduledSession, SessionOutcome } from '../types';
-import { createOutcome, createScheduledSession, isHistoryEligible } from './state';
+import {
+  classifySessions,
+  createOutcome,
+  createScheduledSession,
+  isHistoryEligible,
+} from './state';
 
 const activity: Activity = {
   id: 'ramen',
@@ -44,5 +49,46 @@ describe('state transitions', () => {
     const outcome: SessionOutcome = createOutcome(session, 'completed', { rating: '顶级' });
 
     expect(isHistoryEligible(session, [outcome])).toBe(true);
+  });
+
+  it('keeps past open sessions in needs review', () => {
+    const pastOpenSession: ScheduledSession = {
+      id: 'session-overdue',
+      pair_id: 'pair',
+      activity_id: 'ramen',
+      draw_session_id: 'draw-1',
+      target_week_start_date: '2026-06-22',
+      status: 'ongoing',
+      todo_text: '',
+      created_at: '',
+    };
+
+    const classified = classifySessions([pastOpenSession], [], '2026-06-29');
+
+    expect(classified.needsReviewSessions).toEqual([pastOpenSession]);
+    expect(classified.ongoingSessions).toEqual([]);
+    expect(classified.planningSessions).toEqual([]);
+    expect(classified.historySessions).toEqual([]);
+  });
+
+  it('keeps past sessions with outcomes in history', () => {
+    const pastSession: ScheduledSession = {
+      id: 'session-past-done',
+      pair_id: 'pair',
+      activity_id: 'ramen',
+      draw_session_id: 'draw-1',
+      target_week_start_date: '2026-06-22',
+      status: 'completed',
+      todo_text: '',
+      created_at: '',
+    };
+    const outcome: SessionOutcome = createOutcome(pastSession, 'completed', {
+      rating: '夯',
+    });
+
+    const classified = classifySessions([pastSession], [outcome], '2026-06-29');
+
+    expect(classified.needsReviewSessions).toEqual([]);
+    expect(classified.historySessions).toEqual([pastSession]);
   });
 });
