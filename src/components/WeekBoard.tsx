@@ -44,12 +44,12 @@ export function WeekBoard({
       <div className="rounded-md bg-ink p-5 text-cream shadow-soft">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-cream/70">Week Board</p>
+            <p className="text-sm text-cream/70">本周看板</p>
             <h2 className="mt-1 text-3xl font-black">{formatWeekLabel(currentWeekStart)}</h2>
             <p className="mt-2 text-sm text-cream/70">
               {needsReviewSessions.length
-                ? `${needsReviewSessions.length} need review before new plans`
-                : `${openPlanCount} open plans`}
+                ? `${needsReviewSessions.length} 个过期计划待复盘`
+                : `${openPlanCount} 个进行中的计划`}
             </p>
           </div>
           <div className="grid h-14 w-14 place-items-center rounded-md bg-coral text-cream">
@@ -59,12 +59,12 @@ export function WeekBoard({
       </div>
 
       <div>
-        <SectionTitle title="Needs Review" count={needsReviewSessions.length} />
+        <SectionTitle title="待复盘" count={needsReviewSessions.length} />
         <div className="mt-3 space-y-3">
           {needsReviewSessions.length === 0 && (
             <EmptyState
-              title="All caught up"
-              body="Past plans with no outcome will stay here until you decide what happened."
+              title="都处理完啦"
+              body="过期但还没结果的计划会留在这里，直到你们说清楚它后来怎样了。"
             />
           )}
           {needsReviewSessions.map((session) => (
@@ -79,26 +79,26 @@ export function WeekBoard({
               onNotDone={onNotDone}
               onReplace={onReplace}
               onRedraw={onRedraw}
-              stateLabel="Needs Review"
+              stateLabel="待复盘"
             />
           ))}
         </div>
       </div>
 
       <div>
-        <SectionTitle title="This Week" count={ongoingSessions.length} />
+        <SectionTitle title="本周" count={ongoingSessions.length} />
         <div className="mt-3 space-y-3">
           {ongoingSessions.length === 0 && (
             <EmptyState
-              title="No plan waiting this week"
-              body="Draw one for this week when you want a tiny shared ritual."
+              title="这周还没有计划"
+              body="想来一点两个人的小仪式，就给本周抽一个。"
               action={
                 <button
                   className="h-11 rounded-md bg-coral px-4 font-bold text-cream"
                   type="button"
                   onClick={() => onNavigate('draw')}
                 >
-                  Draw this week
+                  抽本周
                 </button>
               }
             />
@@ -115,26 +115,26 @@ export function WeekBoard({
               onNotDone={onNotDone}
               onReplace={onReplace}
               onRedraw={onRedraw}
-              stateLabel="This Week"
+              stateLabel="本周"
             />
           ))}
         </div>
       </div>
 
       <div>
-        <SectionTitle title="Planning" count={planningSessions.length} />
+        <SectionTitle title="计划中" count={planningSessions.length} />
         <div className="mt-3 space-y-3">
           {planningSessions.length === 0 && (
             <EmptyState
-              title="Next week is still open"
-              body="Set a budget, use bans, and reveal a plan together."
+              title="下周还空着"
+              body="选个预算，各自划掉不想要的，再一起揭晓。"
               action={
                 <button
                   className="h-11 rounded-md bg-ink px-4 font-bold text-cream"
                   type="button"
                   onClick={() => onNavigate('draw')}
                 >
-                  Draw next week
+                  抽下周
                 </button>
               }
             />
@@ -174,7 +174,7 @@ function OngoingCard({
   onNotDone: (session: ScheduledSession, reason: string) => void;
   onReplace: (session: ScheduledSession, replacementActivityId: string) => void;
   onRedraw: (session: ScheduledSession) => void;
-  stateLabel: 'This Week' | 'Needs Review';
+  stateLabel: '本周' | '待复盘';
 }) {
   const [mode, setMode] = useState<'idle' | 'done' | 'missed' | 'replace' | 'redraw'>('idle');
   const [reason, setReason] = useState('');
@@ -200,25 +200,25 @@ function OngoingCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-clay">
-            {stateLabel} · Week {formatWeekLabel(session.target_week_start_date)}
+            {stateLabel} · {formatWeekLabel(session.target_week_start_date)}
           </p>
           <h3 className="mt-1 text-lg font-bold text-ink">{activity.title}</h3>
           <p className="mt-1 text-sm text-ink/60">
-            {stateLabel === 'Needs Review'
-              ? 'This plan is overdue. Choose what happened before it becomes history.'
+            {stateLabel === '待复盘'
+              ? '这个计划已经过期了。先补一个结果，它才会进记录。'
               : session.todo_text}
           </p>
         </div>
-        <Chip tone={stateLabel === 'Needs Review' ? 'butter' : 'coral'}>
-          {budgetById.get(activity.budget_group_id)?.name ?? 'open'}
+        <Chip tone={stateLabel === '待复盘' ? 'butter' : 'coral'}>
+          {budgetById.get(activity.budget_group_id)?.name ?? '随意'}
         </Chip>
       </div>
 
       <div className="mt-4 grid grid-cols-4 gap-2">
-        <ActionButton icon={Check} label="Done" onClick={() => setMode('done')} />
-        <ActionButton icon={X} label="Missed" onClick={() => setMode('missed')} />
-        <ActionButton icon={Repeat2} label="Replace" onClick={() => setMode('replace')} />
-        <ActionButton icon={Shuffle} label="Redraw" onClick={() => setMode('redraw')} />
+        <ActionButton icon={Check} label="完成" onClick={() => setMode('done')} />
+        <ActionButton icon={X} label="没做" onClick={() => setMode('missed')} />
+        <ActionButton icon={Repeat2} label="换一个" onClick={() => setMode('replace')} />
+        <ActionButton icon={Shuffle} label="重抽" onClick={() => setMode('redraw')} />
       </div>
 
       {mode === 'done' && (
@@ -240,7 +240,7 @@ function OngoingCard({
         <div className="mt-4 grid gap-2">
           <input
             className="h-11 rounded-md border border-ink/10 bg-cream px-3 text-sm"
-            placeholder="Short reason"
+            placeholder="简单说下原因"
             value={reason}
             onChange={(event) => setReason(event.target.value)}
           />
@@ -250,16 +250,16 @@ function OngoingCard({
             disabled={reason.trim().length < 3}
             onClick={() => onNotDone(session, reason.trim())}
           >
-            Archive as not done
+            记为没做
           </button>
         </div>
       )}
 
       {(mode === 'replace' || mode === 'redraw') && (
         <div className="mt-4 space-y-3 rounded-md bg-cream p-3">
-          {stateLabel === 'Needs Review' && (
+          {stateLabel === '待复盘' && (
             <p className="text-sm font-semibold text-ink/60">
-              Overdue changes are rescheduled to this week.
+              过期计划如果换掉或重抽，会顺手排到本周。
             </p>
           )}
           {mode === 'replace' && (
@@ -268,7 +268,7 @@ function OngoingCard({
               value={replacementId}
               onChange={(event) => setReplacementId(event.target.value)}
             >
-              <option value="">Choose replacement</option>
+              <option value="">选一个替代活动</option>
               {replacements.map((candidate) => (
                 <option key={candidate.id} value={candidate.id}>
                   {candidate.title}
@@ -288,7 +288,7 @@ function OngoingCard({
                 type="button"
                 onClick={() => toggleAgreement(member.id)}
               >
-                {member.display_name} agrees
+                {member.display_name} 同意
               </button>
             ))}
           </div>
@@ -300,7 +300,7 @@ function OngoingCard({
               mode === 'replace' ? onReplace(session, replacementId) : onRedraw(session)
             }
           >
-            {mode === 'replace' ? 'Replace together' : 'Redraw together'}
+            {mode === 'replace' ? '一起换掉' : '一起重抽'}
           </button>
         </div>
       )}
@@ -322,12 +322,12 @@ function PlanCard({
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="text-xs font-bold uppercase tracking-[0.16em] text-clay">
-            Week {formatWeekLabel(session.target_week_start_date)}
+            {formatWeekLabel(session.target_week_start_date)}
           </p>
           <h3 className="mt-1 text-lg font-bold text-ink">{activity.title}</h3>
           <p className="mt-1 text-sm text-ink/60">{session.todo_text}</p>
         </div>
-        <Chip tone="mint">{budgetById.get(activity.budget_group_id)?.name ?? 'open'}</Chip>
+        <Chip tone="mint">{budgetById.get(activity.budget_group_id)?.name ?? '随意'}</Chip>
       </div>
       <div className="mt-3 flex flex-wrap gap-2">
         {activity.tags.slice(0, 3).map((tag) => (

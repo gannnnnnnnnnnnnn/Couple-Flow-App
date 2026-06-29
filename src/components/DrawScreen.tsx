@@ -79,8 +79,8 @@ export function DrawScreen({
   return (
     <section className="space-y-5">
       <div>
-        <h2 className="text-2xl font-black text-ink">Draw</h2>
-        <p className="mt-1 text-sm text-ink/60">Choose the week, budget, and two tiny vetoes each.</p>
+        <h2 className="text-2xl font-black text-ink">抽签</h2>
+        <p className="mt-1 text-sm text-ink/60">选好周次和预算，每个人最多先划掉两个不想要的。</p>
       </div>
 
       <div className="grid grid-cols-2 gap-2">
@@ -91,7 +91,7 @@ export function DrawScreen({
           type="button"
           onClick={() => onTargetWeekChange(currentWeekStart)}
         >
-          This week
+          本周
         </button>
         <button
           className={`h-12 rounded-md font-bold ${
@@ -100,13 +100,13 @@ export function DrawScreen({
           type="button"
           onClick={() => onTargetWeekChange(nextWeekStart)}
         >
-          Next week
+          下周
         </button>
       </div>
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         <BudgetPill active={budgetFilter === 'all'} onClick={() => onBudgetChange('all')}>
-          all
+          全部
         </BudgetPill>
         {budgetGroups.map((budget) => (
           <BudgetPill
@@ -126,7 +126,7 @@ export function DrawScreen({
             activities={bannableActivities}
             bans={bans}
             budgetLabel={
-              budgetFilter === 'all' ? 'all budgets' : budgetById.get(budgetFilter)?.name ?? 'budget'
+              budgetFilter === 'all' ? '全部预算' : budgetById.get(budgetFilter)?.name ?? '预算'
             }
             drawSessionId={drawSessionId}
             member={member}
@@ -138,8 +138,8 @@ export function DrawScreen({
       <div className="rounded-md bg-white/80 p-4 shadow-sm">
         <div className="flex items-center justify-between">
           <div>
-            <p className="text-sm font-bold text-ink">Eligible activities</p>
-            <p className="text-sm text-ink/58">Week {formatWeekLabel(targetWeekStart)}</p>
+            <p className="text-sm font-bold text-ink">可抽活动</p>
+            <p className="text-sm text-ink/58">{formatWeekLabel(targetWeekStart)} 那周</p>
           </div>
           <Chip tone={eligibleActivities.length ? 'mint' : 'butter'}>{eligibleActivities.length}</Chip>
         </div>
@@ -149,18 +149,18 @@ export function DrawScreen({
           disabled={!eligibleActivities.length || revealing}
           onClick={runDraw}
         >
-          {revealing ? 'Revealing...' : 'Draw 1-3 plans'}
+          {revealing ? '揭晓中...' : '抽 1-3 个计划'}
         </button>
       </div>
 
       <div>
-        <SectionTitle title="Reveal Stack" count={drawResults.length} />
+        <SectionTitle title="揭晓区" count={drawResults.length} />
         <div className={`mt-3 space-y-3 ${revealing ? 'animate-draw-shuffle' : ''}`}>
           {revealing && (
             <article className="rounded-md bg-ink p-4 text-cream shadow-soft">
               <div className="mb-4 flex items-center justify-between">
                 <Sparkles size={22} />
-                <Chip tone="light">drawing</Chip>
+                <Chip tone="light">抽签中</Chip>
               </div>
               <div className="h-7 w-3/4 rounded-md bg-cream/22" />
               <div className="mt-3 h-4 w-full rounded-md bg-cream/14" />
@@ -169,8 +169,8 @@ export function DrawScreen({
           )}
           {!revealing && drawResults.length === 0 && (
             <EmptyState
-              title="No reveal yet"
-              body="Set bans and tap draw. Accepted cards become plans, not history, and they are saved on this phone."
+              title="还没揭晓"
+              body="先选屏蔽项，再点抽签。收下的卡会变成本周计划，不会直接进记录。"
             />
           )}
           {drawResults.map((activity, index) => (
@@ -181,7 +181,7 @@ export function DrawScreen({
             >
               <div className="mb-4 flex items-center justify-between">
                 <Sparkles size={22} />
-                <Chip tone="light">{budgetById.get(activity.budget_group_id)?.name ?? 'open'}</Chip>
+                <Chip tone="light">{budgetById.get(activity.budget_group_id)?.name ?? '随意'}</Chip>
               </div>
               <h3 className="text-2xl font-black leading-tight">{activity.title}</h3>
               <p className="mt-2 text-sm text-cream/75">{activity.note}</p>
@@ -190,7 +190,7 @@ export function DrawScreen({
                 type="button"
                 onClick={() => onAccept(activity)}
               >
-                Accept this plan
+                就它了
               </button>
             </article>
           ))}
@@ -223,7 +223,7 @@ function BanPanel({
     <div className="rounded-md bg-white/80 p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <p className="font-black text-ink">{member.display_name}'s current-draw bans</p>
+          <p className="font-black text-ink">{member.display_name} 这轮不想抽到</p>
           <p className="text-xs font-semibold text-ink/50">{budgetLabel}</p>
         </div>
         <Chip tone={memberBans.length === 2 ? 'coral' : 'butter'}>{memberBans.length}/2</Chip>
@@ -231,7 +231,7 @@ function BanPanel({
       <div className="grid gap-2">
         {activities.length === 0 && (
           <p className="rounded-md bg-cream px-3 py-3 text-sm font-semibold text-ink/55">
-            No active activities in this budget.
+            这个预算里暂时没有可用活动。
           </p>
         )}
         {activities.map((activity) => {
@@ -252,7 +252,7 @@ function BanPanel({
               onClick={() => onToggleBan(member.id, activity.id)}
             >
               <span>{activity.title}</span>
-              {isBanned && <span>ban</span>}
+              {isBanned && <span>已划掉</span>}
             </button>
           );
         })}

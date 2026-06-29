@@ -2,6 +2,13 @@ import { formatWeekLabel } from '../domain/week';
 import type { Activity, ScheduledSession, SessionOutcome } from '../types';
 import { Chip, EmptyState, SectionTitle } from './common';
 
+const outcomeLabels = {
+  completed: '已完成',
+  not_done: '没做成',
+  replaced: '已换掉',
+  redrawn: '已重抽',
+};
+
 export function HistoryScreen({
   activityById,
   historySessions,
@@ -21,18 +28,18 @@ export function HistoryScreen({
   return (
     <section className="space-y-4">
       <div>
-        <h2 className="text-2xl font-black text-ink">History</h2>
-        <p className="mt-1 text-sm text-ink/60">{historySessions.length} archived outcomes</p>
+        <h2 className="text-2xl font-black text-ink">记录</h2>
+        <p className="mt-1 text-sm text-ink/60">{historySessions.length} 条已收进记录</p>
       </div>
       {weekKeys.length === 0 && (
         <EmptyState
-          title="No history yet"
-          body="Plans only land here after done, missed, replaced, or redrawn outcomes."
+          title="还没有记录"
+          body="计划只有在完成、没做、换掉或重抽之后，才会来到这里。"
         />
       )}
       {weekKeys.map((weekStart) => (
         <div key={weekStart} className="space-y-3">
-          <SectionTitle title={`Week ${formatWeekLabel(weekStart)}`} />
+          <SectionTitle title={formatWeekLabel(weekStart)} />
           {grouped[weekStart].map((session) => {
             const activity = activityById.get(session.activity_id)!;
             const outcome = outcomeBySessionId.get(session.id)!;
@@ -41,11 +48,11 @@ export function HistoryScreen({
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="text-xs font-bold uppercase tracking-[0.16em] text-clay">
-                      {outcome.outcome_type}
+                      {outcomeLabels[outcome.outcome_type]}
                     </p>
                     <h3 className="mt-1 text-lg font-bold text-ink">{activity.title}</h3>
                   </div>
-                  {outcome.rating ? <Chip>{outcome.rating}</Chip> : <Chip>{outcome.reason ?? 'agreed'}</Chip>}
+                  {outcome.rating ? <Chip>{outcome.rating}</Chip> : <Chip>{outcome.reason ?? '已同意'}</Chip>}
                 </div>
                 {outcome.reason && <p className="mt-3 text-sm text-ink/62">{outcome.reason}</p>}
               </article>

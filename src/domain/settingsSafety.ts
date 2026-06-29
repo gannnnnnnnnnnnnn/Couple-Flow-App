@@ -37,26 +37,26 @@ export function getSettingsSafetyCopy({
 }: SettingsSafetyInput): SettingsSafetyCopy {
   if (identity) {
     return {
-      clearActionLabel: 'Disconnect this device',
+      clearActionLabel: '断开本设备',
       clearConfirmation:
-        'Disconnect this device from the pair? Remote shared pair data will not be deleted or changed.',
+        '要断开这台设备吗？云端双人数据不会被删除或改动。',
       resetDemoDisabled: true,
-      resetDemoMessage: 'Demo reset is disabled while connected to a pair.',
+      resetDemoMessage: '已连接双人空间时不能重置演示数据。',
       syncStatusLabel: hasRemoteEnv
-        ? `Connected to pair code ${identity.pairCode}`
-        : 'Local only: Supabase env missing',
+        ? `已连接配对码 ${identity.pairCode}`
+        : '本机模式：未配置同步',
     };
   }
 
   return {
-    clearActionLabel: 'Clear this device data',
+    clearActionLabel: '清空本机数据',
     clearConfirmation:
-      'Clear data saved on this device? Remote pair data will not be affected.',
+      '要清空这台设备上的数据吗？云端数据不会受影响。',
     resetDemoDisabled: false,
     resetDemoMessage: null,
     syncStatusLabel: hasRemoteEnv
-      ? 'Sync available, not connected'
-      : 'Local only: Supabase env missing',
+      ? '可同步，尚未配对'
+      : '本机模式：未配置同步',
   };
 }
 
@@ -67,31 +67,31 @@ export function getRuntimeSyncStatusCopy({
   savedAt,
   syncing,
 }: RuntimeSyncStatusInput): RuntimeSyncStatusCopy {
-  const lastSaved = savedAt ? `Last saved ${formatSavedTime(savedAt)}` : null;
+  const lastSaved = savedAt ? `上次保存 ${formatSavedTime(savedAt)}` : null;
 
   if (!hasRemoteEnv) {
     return {
-      detail: 'Local mode is fully usable on this device.',
+      detail: '这台设备可以完整使用，只是不会同步到另一边。',
       error,
       lastSaved,
-      status: 'Local only: Supabase env missing',
+      status: '本机模式：未配置同步',
     };
   }
 
   if (!identity) {
     return {
-      detail: 'Create or join a pair code to load shared data.',
+      detail: '创建或加入配对码后，就能读取同一个双人空间。',
       error,
       lastSaved,
-      status: syncing ? 'Preparing sync' : 'Sync available, not connected',
+      status: syncing ? '准备同步中' : '可同步，尚未配对',
     };
   }
 
   return {
-    detail: `Pair code ${identity.pairCode} as ${identity.displayName}`,
+    detail: `配对码 ${identity.pairCode} · ${identity.displayName}`,
     error,
     lastSaved,
-    status: syncing ? 'Syncing' : 'Connected',
+    status: syncing ? '同步中' : '已连接',
   };
 }
 
@@ -108,7 +108,7 @@ function formatSavedTime(savedAt: string) {
 
 export function getImportResultMessage(result: ImportDataResult) {
   if (result.status === 'success') {
-    return 'Backup imported on this device.';
+    return '备份已导入这台设备。';
   }
 
   if (result.status === 'error') {

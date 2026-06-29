@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { AppShell } from './components/AppShell';
 import { DrawScreen } from './components/DrawScreen';
 import { HistoryScreen } from './components/HistoryScreen';
@@ -7,6 +7,12 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { WeekBoard } from './components/WeekBoard';
 import type { Screen } from './components/common';
 import { parseAppBackupJson, stringifyAppBackup } from './domain/backup';
+import {
+  AUTOSAVE_DEBOUNCE_MS,
+  SYNCING_VISIBILITY_DELAY_MS,
+  getLocalAppDataFingerprint,
+  shouldSkipAutosaveForSnapshot,
+} from './domain/autosave';
 import type { ImportDataResult } from './domain/settingsSafety';
 import {
   classifySessions,
@@ -87,6 +93,9 @@ function App() {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
   const [hydrating, setHydrating] = useState(true);
+  const lastSavedFingerprintRef = useRef<string | null>(null);
+  const remoteSnapshotFingerprintRef = useRef<string | null>(null);
+  const saveSequenceRef = useRef(0);
 
   const currentWeekStart = useMemo(
     () => getWeekStartDate(new Date(), activePair.timezone),
@@ -115,7 +124,13 @@ function App() {
   const activePairId = pairIdentity?.pairId ?? activePair.id;
   const activeMemberId = pairIdentity?.memberId ?? activeMembers[0]?.id ?? 'member-local';
 
-  function applySnapshot(snapshot: RepositorySnapshot) {
+  function applySnapshot(snapshot: RepositorySnapshot, suppressAutosave = true) {
+    const fingerprint = getLocalAppDataFingerprint(snapshot.data);
+    if (suppressAutosave) {
+      remoteSnapshotFingerprintRef.current = fingerprint;
+      lastSavedFingerprintRef.current = fingerprint;
+    }
+
     setActivities(snapshot.data.activities);
     setScheduledSessions(snapshot.data.scheduledSessions);
     setOutcomes(snapshot.data.outcomes);
@@ -172,20 +187,65 @@ function App() {
     }
 
     const snapshotData = getCurrentAppData();
+    const currentFingerprint = getLocalAppDataFingerprint(snapshotData);
 
-    setSyncing(true);
-    repository
-      .saveSnapshot(snapshotData, pairIdentity)
-      .then(({ savedAt, mode }) => {
-        if (savedAt) {
-          setLastSavedAt(savedAt);
-          setStorageSource('saved');
-        }
-        setRepositoryMode(mode);
-        setSyncError(null);
+    if (
+      shouldSkipAutosaveForSnapshot({
+        currentFingerprint,
+        lastSavedFingerprint: lastSavedFingerprintRef.current,
+        remoteFingerprint: remoteSnapshotFingerprintRef.current,
       })
-      .catch((error: Error) => setSyncError(error.message))
-      .finally(() => setSyncing(false));
+    ) {
+      remoteSnapshotFingerprintRef.current = null;
+      return;
+    }
+
+    const saveId = saveSequenceRef.current + 1;
+    saveSequenceRef.current = saveId;
+    let syncingTimer: number | undefined;
+
+    const debounceTimer = window.setTimeout(() => {
+      syncingTimer = window.setTimeout(() => {
+        if (saveSequenceRef.current === saveId) {
+          setSyncing(true);
+        }
+      }, SYNCING_VISIBILITY_DELAY_MS);
+
+      repository
+        .saveSnapshot(snapshotData, pairIdentity)
+        .then(({ savedAt, mode }) => {
+          if (saveSequenceRef.current !== saveId) {
+            return;
+          }
+          lastSavedFingerprintRef.current = currentFingerprint;
+          if (savedAt) {
+            setLastSavedAt(savedAt);
+            setStorageSource('saved');
+          }
+          setRepositoryMode(mode);
+          setSyncError(null);
+        })
+        .catch((error: Error) => {
+          if (saveSequenceRef.current === saveId) {
+            setSyncError(error.message);
+          }
+        })
+        .finally(() => {
+          if (syncingTimer) {
+            window.clearTimeout(syncingTimer);
+          }
+          if (saveSequenceRef.current === saveId) {
+            setSyncing(false);
+          }
+        });
+    }, AUTOSAVE_DEBOUNCE_MS);
+
+    return () => {
+      window.clearTimeout(debounceTimer);
+      if (syncingTimer) {
+        window.clearTimeout(syncingTimer);
+      }
+    };
   }, [
     activities,
     bans,
@@ -203,7 +263,7 @@ function App() {
       return undefined;
     }
 
-    return repository.subscribeToPair(pairIdentity, applySnapshot);
+    return repository.subscribeToPair(pairIdentity, (snapshot) => applySnapshot(snapshot));
   }, [pairIdentity, repository]);
 
   function replaceLocalState(data = createDemoLocalAppData()) {
@@ -224,7 +284,7 @@ function App() {
     }
 
     const confirmed = window.confirm(
-      'Reset this phone to the demo Couple Flow data? Your local changes will be replaced.',
+      '要把这台设备恢复成演示数据吗？本机改动会被替换。',
     );
 
     if (!confirmed) {
@@ -245,7 +305,7 @@ function App() {
       );
       applySnapshot(snapshot);
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : 'Could not create pair code.');
+      setSyncError(error instanceof Error ? error.message : '配对码创建失败。');
     } finally {
       setHydrating(false);
       setSyncing(false);
@@ -260,7 +320,7 @@ function App() {
       const snapshot = await repository.joinPairAndLoad(pairCode, displayName);
       applySnapshot(snapshot);
     } catch (error) {
-      setSyncError(error instanceof Error ? error.message : 'Could not join pair code.');
+      setSyncError(error instanceof Error ? error.message : '加入配对失败。');
     } finally {
       setHydrating(false);
       setSyncing(false);
@@ -270,8 +330,8 @@ function App() {
   function clearLocalUserData() {
     const confirmed = window.confirm(
       pairIdentity
-        ? 'Disconnect this device from the pair? Remote shared pair data will not be deleted or changed.'
-        : 'Clear data saved on this device? Remote pair data will not be affected.',
+        ? '要断开这台设备吗？云端双人数据不会被删除或改动。'
+        : '要清空这台设备上的数据吗？云端数据不会受影响。',
     );
 
     if (!confirmed) {
@@ -301,7 +361,7 @@ function App() {
     if (pairIdentity) {
       return {
         status: 'error',
-        message: 'Import is disabled while connected to a pair.',
+        message: '已连接双人空间时不能导入，避免覆盖同步数据。',
       };
     }
 
@@ -312,7 +372,7 @@ function App() {
     }
 
     const confirmed = window.confirm(
-      'Import this backup on this device? It will replace local activities, plans, outcomes, bans, target week, and budget filter. Remote pair data will not be affected.',
+      '要在这台设备导入备份吗？本机的活动、计划、记录、屏蔽项、目标周和预算筛选会被替换，云端数据不受影响。',
     );
     if (!confirmed) {
       return { status: 'cancelled' };

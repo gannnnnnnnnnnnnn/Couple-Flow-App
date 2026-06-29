@@ -1,7 +1,7 @@
 {
   "name": "Couple Flow",
   "short_name": "Couple Flow",
-  "description": "A playful weekly planning board for couples.",
+  "description": "给两个人一起玩的一周计划小看板。",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#fff9f1",

@@ -17,6 +17,7 @@
 - [x] Draw Flow exists.
 - [x] History exists.
 - [x] Settings / Pair exists.
+- [x] Normal user-facing app screens use Simplified Chinese copy.
 - [x] Local-first persistence exists before Supabase.
 - [x] Optional Supabase pair-code sync exists without requiring env vars for demo mode.
 - [x] Supabase setup docs cover schema install, env vars, Realtime replication, restart checks, and troubleshooting.
@@ -42,6 +43,7 @@
 - [x] Pair-code join hydrates remote state before autosave can run.
 - [x] Pair-code create intentionally migrates current local state once.
 - [x] Normal Supabase autosave is upsert-only and does not delete remote-only rows.
+- [x] Autosave is debounced and skips immediate saves after identical remote snapshots are applied.
 
 ## Validation
 
