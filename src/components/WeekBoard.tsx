@@ -253,6 +253,11 @@ function OngoingCard({
 
       {(mode === 'replace' || mode === 'redraw') && (
         <div className="mt-4 space-y-3 rounded-md bg-cream p-3">
+          {stateLabel === 'Needs Review' && (
+            <p className="text-sm font-semibold text-ink/60">
+              Overdue changes are rescheduled to this week.
+            </p>
+          )}
           {mode === 'replace' && (
             <select
               className="h-11 w-full rounded-md border border-ink/10 bg-white px-3 text-sm"

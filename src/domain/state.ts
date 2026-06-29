@@ -63,6 +63,15 @@ export function createScheduledSession(
   };
 }
 
+export function getFollowUpTargetWeek(
+  session: ScheduledSession,
+  currentWeekStart: string,
+) {
+  return session.target_week_start_date < currentWeekStart
+    ? currentWeekStart
+    : session.target_week_start_date;
+}
+
 export function createOutcome(
   session: ScheduledSession,
   outcomeType: OutcomeType,

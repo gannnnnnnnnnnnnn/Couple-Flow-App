@@ -11,6 +11,7 @@ This is the first spec-driven draft for Couple Flow.
 - Local mock data mirrors the Supabase-ready table names and core fields.
 - Week Board, Activity Pool, Draw Flow, History, and Settings / Pair screens are playable in local state.
 - Week Board keeps past open sessions visible under Needs Review / Overdue until an outcome is recorded.
+- Replacing or redrawing from Needs Review reschedules follow-up work to the current week by default.
 - Draw supports target week, budget filter, two per-member activity bans, eligible count, reveal stack, and accept.
 - Ongoing plans support Done, Not done, Replace, and Redraw outcomes.
 - Critical state rule is represented in UI data flow: draw/accept creates a scheduled session, not history.

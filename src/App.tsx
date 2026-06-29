@@ -10,6 +10,7 @@ import {
   classifySessions,
   createOutcome,
   createScheduledSession,
+  getFollowUpTargetWeek,
   getOutcomeBySessionId,
 } from './domain/state';
 import { getNextWeekStartDate, getWeekStartDate } from './domain/week';
@@ -156,26 +157,30 @@ function App() {
         agreedByMemberIds: members.map((member) => member.id),
       }),
     ]);
+    const followUpTargetWeek = getFollowUpTargetWeek(session, currentWeekStart);
+
     setScheduledSessions((sessions) => [
       ...sessions,
       createScheduledSession(
         replacement,
         `manual-replace-${session.id}`,
         pair.id,
-        session.target_week_start_date,
+        followUpTargetWeek,
         currentWeekStart,
       ),
     ]);
   }
 
   function redrawSession(session: ScheduledSession) {
+    const followUpTargetWeek = getFollowUpTargetWeek(session, currentWeekStart);
+
     setOutcomes((currentOutcomes) => [
       ...currentOutcomes,
       createOutcome(session, 'redrawn', {
         agreedByMemberIds: members.map((member) => member.id),
       }),
     ]);
-    setTargetWeekStart(session.target_week_start_date);
+    setTargetWeekStart(followUpTargetWeek);
     setDrawResults([]);
     setActiveScreen('draw');
   }

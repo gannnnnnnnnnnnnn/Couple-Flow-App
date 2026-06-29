@@ -4,6 +4,7 @@ import {
   classifySessions,
   createOutcome,
   createScheduledSession,
+  getFollowUpTargetWeek,
   isHistoryEligible,
 } from './state';
 
@@ -90,5 +91,35 @@ describe('state transitions', () => {
 
     expect(classified.needsReviewSessions).toEqual([]);
     expect(classified.historySessions).toEqual([pastSession]);
+  });
+
+  it('reschedules follow-up work for overdue sessions to the current week', () => {
+    const overdueSession: ScheduledSession = {
+      id: 'session-overdue',
+      pair_id: 'pair',
+      activity_id: 'ramen',
+      draw_session_id: 'draw-1',
+      target_week_start_date: '2026-06-22',
+      status: 'needs_review',
+      todo_text: '',
+      created_at: '',
+    };
+
+    expect(getFollowUpTargetWeek(overdueSession, '2026-06-29')).toBe('2026-06-29');
+  });
+
+  it('keeps follow-up work for ongoing sessions in the current week', () => {
+    const ongoingSession: ScheduledSession = {
+      id: 'session-current',
+      pair_id: 'pair',
+      activity_id: 'ramen',
+      draw_session_id: 'draw-1',
+      target_week_start_date: '2026-06-29',
+      status: 'ongoing',
+      todo_text: '',
+      created_at: '',
+    };
+
+    expect(getFollowUpTargetWeek(ongoingSession, '2026-06-29')).toBe('2026-06-29');
   });
 });

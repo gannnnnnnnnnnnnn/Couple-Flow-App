@@ -23,10 +23,10 @@ stateDiagram-v2
   Ongoing --> NotDone: not done + reason
   Ongoing --> Replaced: both agreed replacement
   Ongoing --> Redrawn: both agreed redraw
-  NeedsReview --> Completed: completed + rating
-  NeedsReview --> NotDone: not done + reason
-  NeedsReview --> Replaced: both agreed replacement
-  NeedsReview --> Redrawn: both agreed redraw
+NeedsReview --> Completed: completed + rating
+NeedsReview --> NotDone: not done + reason
+NeedsReview --> Replaced: both agreed replacement, follow-up scheduled for current week
+NeedsReview --> Redrawn: both agreed redraw, draw target resets to current week
   Completed --> History
   NotDone --> History
   Replaced --> History
@@ -67,6 +67,7 @@ For a pair timezone:
 - If `target_week_start_date` equals the current week start and no outcome exists, show under This Week / Ongoing.
 - If `target_week_start_date` is before the current week start and no outcome exists, show under Needs Review / Overdue.
 - If an outcome exists, show under History regardless of target date.
+- Replacing or redrawing a Needs Review / Overdue session archives the overdue session and schedules the follow-up for the current week by default.
 
 ## Forbidden Transitions
 
