@@ -3,8 +3,10 @@ import {
   LOCAL_STATE_STORAGE_KEY,
   clearLocalAppData,
   createDemoLocalAppData,
+  loadPairIdentity,
   loadLocalAppData,
   saveLocalAppData,
+  savePairIdentity,
   type StorageLike,
 } from './localPersistence';
 
@@ -82,5 +84,26 @@ describe('local persistence', () => {
 
     expect(storage.getItem(LOCAL_STATE_STORAGE_KEY)).toBeNull();
     expect(loadLocalAppData(storage).source).toBe('demo');
+  });
+
+  it('stores the current pair and member identity locally', () => {
+    const storage = new MemoryStorage();
+
+    savePairIdentity(
+      {
+        pairId: 'pair-remote',
+        memberId: 'member-me',
+        pairCode: 'ABC123',
+        displayName: 'Me',
+      },
+      storage,
+    );
+
+    expect(loadPairIdentity(storage)).toEqual({
+      pairId: 'pair-remote',
+      memberId: 'member-me',
+      pairCode: 'ABC123',
+      displayName: 'Me',
+    });
   });
 });

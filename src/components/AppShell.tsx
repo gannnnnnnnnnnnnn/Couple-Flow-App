@@ -1,15 +1,19 @@
 import type { ReactNode } from 'react';
-import { members, pair } from '../mockData';
+import type { Pair, PairMember } from '../types';
 import { navItems, type Screen } from './common';
 
 export function AppShell({
   activeScreen,
   children,
+  members,
   onNavigate,
+  pair,
 }: {
   activeScreen: Screen;
   children: ReactNode;
+  members: PairMember[];
   onNavigate: (screen: Screen) => void;
+  pair: Pair;
 }) {
   return (
     <div className="min-h-screen bg-cream">

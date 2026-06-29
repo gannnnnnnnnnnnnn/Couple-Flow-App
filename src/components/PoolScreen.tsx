@@ -7,12 +7,16 @@ export function PoolScreen({
   activities,
   budgetGroups,
   budgetById,
+  currentMemberId,
+  pairId,
   onAddActivity,
   onToggleStatus,
 }: {
   activities: Activity[];
   budgetGroups: BudgetGroup[];
   budgetById: Map<string, BudgetGroup>;
+  currentMemberId: string;
+  pairId: string;
   onAddActivity: (activity: Activity) => void;
   onToggleStatus: (activityId: string) => void;
 }) {
@@ -63,10 +67,12 @@ export function PoolScreen({
       {formOpen && (
         <AddActivityForm
           budgetGroups={budgetGroups}
+          currentMemberId={currentMemberId}
           onAdd={(activity) => {
             onAddActivity(activity);
             setFormOpen(false);
           }}
+          pairId={pairId}
         />
       )}
 
@@ -122,10 +128,14 @@ export function PoolScreen({
 
 function AddActivityForm({
   budgetGroups,
+  currentMemberId,
   onAdd,
+  pairId,
 }: {
   budgetGroups: BudgetGroup[];
+  currentMemberId: string;
   onAdd: (activity: Activity) => void;
+  pairId: string;
 }) {
   const [title, setTitle] = useState('');
   const [note, setNote] = useState('');
@@ -140,7 +150,7 @@ function AddActivityForm({
 
     onAdd({
       id: `activity-${Date.now()}`,
-      pair_id: 'pair-001',
+      pair_id: pairId,
       title: title.trim(),
       note: note.trim() || 'A fresh idea from the pool.',
       budget_group_id: budgetId,
@@ -149,7 +159,7 @@ function AddActivityForm({
         .split(',')
         .map((tag) => tag.trim())
         .filter(Boolean),
-      created_by_member_id: 'member-g',
+      created_by_member_id: currentMemberId,
       status: 'active',
       created_at: new Date().toISOString(),
     });
