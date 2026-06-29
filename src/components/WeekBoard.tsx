@@ -44,9 +44,13 @@ export function WeekBoard({
       <div className="rounded-md bg-ink p-5 text-cream shadow-soft">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-cream/70">This Week</p>
+            <p className="text-sm text-cream/70">Week Board</p>
             <h2 className="mt-1 text-3xl font-black">{formatWeekLabel(currentWeekStart)}</h2>
-            <p className="mt-2 text-sm text-cream/70">{openPlanCount} open plans</p>
+            <p className="mt-2 text-sm text-cream/70">
+              {needsReviewSessions.length
+                ? `${needsReviewSessions.length} need review before new plans`
+                : `${openPlanCount} open plans`}
+            </p>
           </div>
           <div className="grid h-14 w-14 place-items-center rounded-md bg-coral text-cream">
             <CalendarDays size={27} />
@@ -55,7 +59,34 @@ export function WeekBoard({
       </div>
 
       <div>
-        <SectionTitle title="Ongoing" count={ongoingSessions.length} />
+        <SectionTitle title="Needs Review" count={needsReviewSessions.length} />
+        <div className="mt-3 space-y-3">
+          {needsReviewSessions.length === 0 && (
+            <EmptyState
+              title="All caught up"
+              body="Past plans with no outcome will stay here until you decide what happened."
+            />
+          )}
+          {needsReviewSessions.map((session) => (
+            <OngoingCard
+              key={session.id}
+              activity={activityById.get(session.activity_id)!}
+              activities={activities}
+              budgetById={budgetById}
+              members={members}
+              session={session}
+              onComplete={onComplete}
+              onNotDone={onNotDone}
+              onReplace={onReplace}
+              onRedraw={onRedraw}
+              stateLabel="Needs Review"
+            />
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <SectionTitle title="This Week" count={ongoingSessions.length} />
         <div className="mt-3 space-y-3">
           {ongoingSessions.length === 0 && (
             <EmptyState
@@ -85,33 +116,6 @@ export function WeekBoard({
               onReplace={onReplace}
               onRedraw={onRedraw}
               stateLabel="This Week"
-            />
-          ))}
-        </div>
-      </div>
-
-      <div>
-        <SectionTitle title="Needs Review" count={needsReviewSessions.length} />
-        <div className="mt-3 space-y-3">
-          {needsReviewSessions.length === 0 && (
-            <EmptyState
-              title="Nothing overdue"
-              body="Past plans with no outcome will wait here until you review them together."
-            />
-          )}
-          {needsReviewSessions.map((session) => (
-            <OngoingCard
-              key={session.id}
-              activity={activityById.get(session.activity_id)!}
-              activities={activities}
-              budgetById={budgetById}
-              members={members}
-              session={session}
-              onComplete={onComplete}
-              onNotDone={onNotDone}
-              onReplace={onReplace}
-              onRedraw={onRedraw}
-              stateLabel="Needs Review"
             />
           ))}
         </div>

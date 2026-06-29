@@ -1,0 +1,86 @@
+import { describe, expect, it } from 'vitest';
+import {
+  LOCAL_STATE_STORAGE_KEY,
+  clearLocalAppData,
+  createDemoLocalAppData,
+  loadLocalAppData,
+  saveLocalAppData,
+  type StorageLike,
+} from './localPersistence';
+
+class MemoryStorage implements StorageLike {
+  private values = new Map<string, string>();
+
+  getItem(key: string) {
+    return this.values.get(key) ?? null;
+  }
+
+  setItem(key: string, value: string) {
+    this.values.set(key, value);
+  }
+
+  removeItem(key: string) {
+    this.values.delete(key);
+  }
+}
+
+describe('local persistence', () => {
+  it('seeds demo data when no saved local data exists', () => {
+    const result = loadLocalAppData(new MemoryStorage());
+
+    expect(result.source).toBe('demo');
+    expect(result.canPersist).toBe(true);
+    expect(result.data.activities.length).toBeGreaterThan(0);
+    expect(result.data.scheduledSessions.length).toBeGreaterThan(0);
+    expect(result.data.budgetFilter).toBe('all');
+  });
+
+  it('round-trips the local app state payload', () => {
+    const storage = new MemoryStorage();
+    const data = createDemoLocalAppData();
+    const added = {
+      ...data.activities[0],
+      id: 'activity-local-only',
+      title: 'Local only idea',
+    };
+    data.activities = [...data.activities, added];
+    data.targetWeekStart = '2026-07-06';
+
+    const savedAt = saveLocalAppData(
+      data,
+      storage,
+      new Date('2026-06-29T10:00:00.000Z'),
+    );
+    const result = loadLocalAppData(storage);
+
+    expect(savedAt).toBe('2026-06-29T10:00:00.000Z');
+    expect(result.source).toBe('saved');
+    expect(result.savedAt).toBe(savedAt);
+    expect(result.data.activities[result.data.activities.length - 1]).toMatchObject({
+      id: 'activity-local-only',
+      title: 'Local only idea',
+    });
+    expect(result.data.targetWeekStart).toBe('2026-07-06');
+  });
+
+  it('falls back to demo data for invalid saved payloads', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(LOCAL_STATE_STORAGE_KEY, '{"version":1,"data":{"activities":[]}}');
+
+    const result = loadLocalAppData(storage);
+
+    expect(result.source).toBe('demo');
+    expect(result.savedAt).toBeNull();
+    expect(result.data.activities.length).toBeGreaterThan(0);
+  });
+
+  it('clears the saved local payload without touching demo seed construction', () => {
+    const storage = new MemoryStorage();
+    saveLocalAppData(createDemoLocalAppData(), storage);
+
+    clearLocalAppData(storage);
+
+    expect(storage.getItem(LOCAL_STATE_STORAGE_KEY)).toBeNull();
+    expect(loadLocalAppData(storage).source).toBe('demo');
+  });
+});

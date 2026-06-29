@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AppShell } from './components/AppShell';
 import { DrawScreen } from './components/DrawScreen';
 import { HistoryScreen } from './components/HistoryScreen';
@@ -15,13 +15,17 @@ import {
 } from './domain/state';
 import { getNextWeekStartDate, getWeekStartDate } from './domain/week';
 import {
-  activities as mockActivities,
+  clearLocalAppData,
+  createDemoLocalAppData,
+  loadLocalAppData,
+  saveLocalAppData,
+  type LocalStateLoadResult,
+  type LocalStateSource,
+} from './domain/localPersistence';
+import {
   budgetGroups,
   members,
   pair,
-  scheduledSessions as mockScheduledSessions,
-  sessionOutcomes,
-  weeklyActivityBans,
 } from './mockData';
 import type {
   Activity,
@@ -32,17 +36,38 @@ import type {
   WeeklyActivityBan,
 } from './types';
 
+function getInitialLocalState(): LocalStateLoadResult {
+  return loadLocalAppData();
+}
+
 function App() {
+  const initialLocalState = useMemo(() => getInitialLocalState(), []);
   const [activeScreen, setActiveScreen] = useState<Screen>('board');
-  const [activities, setActivities] = useState<Activity[]>(mockActivities);
-  const [scheduledSessions, setScheduledSessions] = useState<ScheduledSession[]>(
-    mockScheduledSessions,
+  const [activities, setActivities] = useState<Activity[]>(
+    initialLocalState.data.activities,
   );
-  const [outcomes, setOutcomes] = useState<SessionOutcome[]>(sessionOutcomes);
-  const [bans, setBans] = useState<WeeklyActivityBan[]>(weeklyActivityBans);
-  const [targetWeekStart, setTargetWeekStart] = useState('');
-  const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all');
+  const [scheduledSessions, setScheduledSessions] = useState<ScheduledSession[]>(
+    initialLocalState.data.scheduledSessions,
+  );
+  const [outcomes, setOutcomes] = useState<SessionOutcome[]>(
+    initialLocalState.data.outcomes,
+  );
+  const [bans, setBans] = useState<WeeklyActivityBan[]>(
+    initialLocalState.data.weeklyActivityBans,
+  );
+  const [targetWeekStart, setTargetWeekStart] = useState(
+    initialLocalState.data.targetWeekStart,
+  );
+  const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>(
+    initialLocalState.data.budgetFilter,
+  );
   const [drawResults, setDrawResults] = useState<Activity[]>([]);
+  const [storageSource, setStorageSource] = useState<LocalStateSource>(
+    initialLocalState.source,
+  );
+  const [lastSavedAt, setLastSavedAt] = useState<string | null>(
+    initialLocalState.savedAt,
+  );
 
   const currentWeekStart = useMemo(
     () => getWeekStartDate(new Date(), pair.timezone),
@@ -67,6 +92,60 @@ function App() {
     () => classifySessions(scheduledSessions, outcomes, currentWeekStart),
     [currentWeekStart, outcomes, scheduledSessions],
   );
+
+  useEffect(() => {
+    const savedAt = saveLocalAppData({
+      activities,
+      scheduledSessions,
+      outcomes,
+      weeklyActivityBans: bans,
+      targetWeekStart,
+      budgetFilter,
+    });
+
+    if (savedAt) {
+      setLastSavedAt(savedAt);
+      setStorageSource('saved');
+    }
+  }, [activities, bans, budgetFilter, outcomes, scheduledSessions, targetWeekStart]);
+
+  function replaceLocalState(data = createDemoLocalAppData()) {
+    setActivities(data.activities);
+    setScheduledSessions(data.scheduledSessions);
+    setOutcomes(data.outcomes);
+    setBans(data.weeklyActivityBans);
+    setTargetWeekStart(data.targetWeekStart);
+    setBudgetFilter(data.budgetFilter);
+    setDrawResults([]);
+    setActiveScreen('board');
+    setStorageSource('demo');
+  }
+
+  function resetToDemoData() {
+    const confirmed = window.confirm(
+      'Reset this phone to the demo Couple Flow data? Your local changes will be replaced.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    replaceLocalState();
+  }
+
+  function clearLocalUserData() {
+    const confirmed = window.confirm(
+      'Clear local user data on this phone? The demo seed will load again so the app stays usable.',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    clearLocalAppData();
+    setLastSavedAt(null);
+    replaceLocalState();
+  }
 
   function changeTargetWeek(weekStart: string) {
     setTargetWeekStart(weekStart);
@@ -261,6 +340,13 @@ function App() {
           ongoingCount={ongoingSessions.length}
           planningCount={planningSessions.length}
           needsReviewCount={needsReviewSessions.length}
+          storageStatus={{
+            canPersist: initialLocalState.canPersist,
+            source: storageSource,
+            savedAt: lastSavedAt,
+          }}
+          onClearLocalData={clearLocalUserData}
+          onResetDemoData={resetToDemoData}
         />
       )}
     </AppShell>
