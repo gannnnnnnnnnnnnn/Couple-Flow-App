@@ -29,7 +29,10 @@
 - [x] Connected Settings shows the pair code and display name with a copy action.
 - [x] Settings disables demo reset and backup import while connected to a pair.
 - [x] Settings disconnect clears local device data without remote deletes.
+- [x] Settings supports explicit local empty start without future demo reseeding on that device.
+- [x] Settings supports explicit shared Supabase clear that preserves pair identity, members, and budget groups.
 - [x] Activity Pool supports faster mobile quick-add entry.
+- [x] Activity Pool supports editing, safe deletion, and pause fallback for referenced activities.
 - [x] JSON backup export/import exists for local mode with shape validation.
 - [x] No photos, maps, payments, or push notifications.
 
@@ -46,6 +49,7 @@
 - [x] Pair-code join hydrates remote state before autosave can run.
 - [x] Pair-code create intentionally migrates current local state once.
 - [x] Normal Supabase autosave is upsert-only and does not delete remote-only rows.
+- [x] Explicit shared clear is the only V0 path that deletes pair-scoped Supabase activities, plans, bans, and outcomes.
 - [x] Autosave is debounced and skips immediate saves after identical remote snapshots are applied.
 - [x] `.env.example` contains placeholders only.
 - [x] `.gitignore` excludes `.env`, `.env.local`, and `.env.*.local`.

@@ -39,6 +39,7 @@ export function SettingsScreen({
   onImportData,
   onJoinPair,
   onResetDemoData,
+  onStartFromScratch,
 }: {
   pair: Pair;
   currentWeekStart: string;
@@ -63,6 +64,7 @@ export function SettingsScreen({
   onImportData: (file: File) => Promise<ImportDataResult>;
   onJoinPair: (pairCode: string, displayName: string) => Promise<void>;
   onResetDemoData: () => void;
+  onStartFromScratch: () => Promise<void>;
 }) {
   const importInputRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState(syncStatus.identity?.displayName ?? '');
@@ -94,6 +96,8 @@ export function SettingsScreen({
       ? '演示数据'
       : savedLabel;
   const isSyncConnected = syncStatus.hasRemoteEnv && Boolean(syncStatus.identity);
+  const displayedStorageValue =
+    storageStatus.source === 'empty' ? '空白状态' : storageValue;
 
   async function handleCopyPairCode() {
     if (!syncStatus.identity) {
@@ -145,7 +149,7 @@ export function SettingsScreen({
         <InfoRow
           icon={Check}
           label="本机保存"
-          value={storageValue}
+          value={displayedStorageValue}
         />
         <InfoRow
           icon={syncStatus.hasRemoteEnv ? Wifi : WifiOff}
@@ -292,6 +296,20 @@ export function SettingsScreen({
               {importMessage}
             </p>
           )}
+          <button
+            className="flex h-11 items-center justify-center gap-2 rounded-md bg-coral px-4 text-sm font-bold text-cream disabled:opacity-40"
+            type="button"
+            disabled={syncStatus.syncing}
+            onClick={() => void onStartFromScratch()}
+          >
+            <Trash2 size={17} />
+            {isSyncConnected ? '清空双人空间数据' : '从空白开始'}
+          </button>
+          <p className="rounded-md bg-cream px-3 py-2 text-xs font-semibold text-ink/58">
+            {isSyncConnected
+              ? '只清空共享的活动、计划、屏蔽项和记录，配对码、成员和预算分组会保留。'
+              : '清空本机演示活动、计划和记录后，这台设备不会再自动放回演示数据。'}
+          </p>
           <button
             className="flex h-11 items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-bold text-cream disabled:opacity-40"
             type="button"

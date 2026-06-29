@@ -2,7 +2,9 @@ import { describe, expect, it } from 'vitest';
 import {
   LOCAL_STATE_STORAGE_KEY,
   clearLocalAppData,
+  createEmptyLocalAppData,
   createDemoLocalAppData,
+  disableDemoSeed,
   loadPairIdentity,
   loadLocalAppData,
   saveLocalAppData,
@@ -35,6 +37,33 @@ describe('local persistence', () => {
     expect(result.data.activities.length).toBeGreaterThan(0);
     expect(result.data.scheduledSessions.length).toBeGreaterThan(0);
     expect(result.data.budgetFilter).toBe('all');
+  });
+
+  it('does not seed demo data when the empty-start flag is set', () => {
+    const storage = new MemoryStorage();
+
+    disableDemoSeed(storage);
+    const result = loadLocalAppData(storage);
+
+    expect(result.source).toBe('empty');
+    expect(result.data.activities).toEqual([]);
+    expect(result.data.scheduledSessions).toEqual([]);
+    expect(result.data.outcomes).toEqual([]);
+    expect(result.data.weeklyActivityBans).toEqual([]);
+    expect(result.data.budgetFilter).toBe('all');
+  });
+
+  it('creates empty local app data with the persisted app shape', () => {
+    const data = createEmptyLocalAppData(new Date('2026-06-29T10:00:00.000Z'));
+
+    expect(data).toMatchObject({
+      activities: [],
+      scheduledSessions: [],
+      outcomes: [],
+      weeklyActivityBans: [],
+      budgetFilter: 'all',
+    });
+    expect(data.targetWeekStart).toMatch(/^\d{4}-\d{2}-\d{2}$/);
   });
 
   it('round-trips the local app state payload', () => {

@@ -4,7 +4,9 @@ import {
   classifySessions,
   createOutcome,
   createScheduledSession,
+  deleteOrPauseActivity,
   getFollowUpTargetWeek,
+  isActivityReferenced,
   isHistoryEligible,
 } from './state';
 
@@ -121,5 +123,67 @@ describe('state transitions', () => {
     };
 
     expect(getFollowUpTargetWeek(ongoingSession, '2026-06-29')).toBe('2026-06-29');
+  });
+
+  it('deletes unreferenced activities and removes stale bans for the activity', () => {
+    const result = deleteOrPauseActivity({
+      activityId: 'ramen',
+      activities: [activity],
+      scheduledSessions: [],
+      outcomes: [],
+      weeklyActivityBans: [],
+    });
+
+    expect(result.result).toBe('deleted');
+    expect(result.activities).toEqual([]);
+    expect(result.weeklyActivityBans).toEqual([]);
+  });
+
+  it('pauses referenced activities instead of deleting them', () => {
+    const session: ScheduledSession = {
+      id: 'session-1',
+      pair_id: 'pair',
+      activity_id: 'ramen',
+      draw_session_id: 'draw-1',
+      target_week_start_date: '2026-06-29',
+      status: 'ongoing',
+      todo_text: '',
+      created_at: '',
+    };
+
+    const result = deleteOrPauseActivity({
+      activityId: 'ramen',
+      activities: [activity],
+      scheduledSessions: [session],
+      outcomes: [],
+      weeklyActivityBans: [],
+    });
+
+    expect(result.result).toBe('paused');
+    expect(result.activities).toEqual([{ ...activity, status: 'paused' }]);
+  });
+
+  it('treats replacement outcomes and activity bans as activity references', () => {
+    const outcome: SessionOutcome = {
+      id: 'outcome-1',
+      scheduled_session_id: 'session-1',
+      outcome_type: 'replaced',
+      rating: null,
+      reason: null,
+      replacement_activity_id: 'ramen',
+      agreed_by_member_ids: ['a', 'b'],
+      created_at: '',
+    };
+    const ban = {
+      id: 'ban-1',
+      draw_session_id: 'draw-1',
+      pair_id: 'pair',
+      member_id: 'a',
+      activity_id: 'ramen',
+      created_at: '',
+    };
+
+    expect(isActivityReferenced('ramen', [], [outcome], [])).toBe(true);
+    expect(isActivityReferenced('ramen', [], [], [ban])).toBe(true);
   });
 });
