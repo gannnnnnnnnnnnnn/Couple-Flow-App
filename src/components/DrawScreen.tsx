@@ -156,16 +156,27 @@ export function DrawScreen({
       <div>
         <SectionTitle title="Reveal Stack" count={drawResults.length} />
         <div className={`mt-3 space-y-3 ${revealing ? 'animate-draw-shuffle' : ''}`}>
-          {drawResults.length === 0 && (
+          {revealing && (
+            <article className="rounded-md bg-ink p-4 text-cream shadow-soft">
+              <div className="mb-4 flex items-center justify-between">
+                <Sparkles size={22} />
+                <Chip tone="light">drawing</Chip>
+              </div>
+              <div className="h-7 w-3/4 rounded-md bg-cream/22" />
+              <div className="mt-3 h-4 w-full rounded-md bg-cream/14" />
+              <div className="mt-2 h-4 w-2/3 rounded-md bg-cream/14" />
+            </article>
+          )}
+          {!revealing && drawResults.length === 0 && (
             <EmptyState
               title="No reveal yet"
-              body="Set bans and tap draw. Accepted cards become plans, not history."
+              body="Set bans and tap draw. Accepted cards become plans, not history, and they are saved on this phone."
             />
           )}
           {drawResults.map((activity, index) => (
             <article
               key={activity.id}
-              className="rounded-md bg-ink p-4 text-cream shadow-soft"
+              className="animate-draw-reveal rounded-md bg-ink p-4 text-cream shadow-soft"
               style={{ transform: `rotate(${(index - 1) * 1.2}deg)` }}
             >
               <div className="mb-4 flex items-center justify-between">

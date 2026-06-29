@@ -71,6 +71,14 @@ export function PoolScreen({
       )}
 
       <div className="space-y-3">
+        {visibleActivities.length === 0 && (
+          <div className="rounded-md border border-dashed border-ink/16 bg-white/60 p-5 text-center">
+            <p className="font-bold text-ink">No ideas in this budget</p>
+            <p className="mt-1 text-sm leading-5 text-ink/58">
+              Add one here or switch budgets to keep the draw pool useful.
+            </p>
+          </div>
+        )}
         {visibleActivities.map((activity) => (
           <article
             key={activity.id}

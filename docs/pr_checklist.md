@@ -17,6 +17,7 @@
 - [x] Draw Flow exists.
 - [x] History exists.
 - [x] Settings / Pair exists.
+- [x] Local-first persistence exists before Supabase.
 - [x] No photos, maps, payments, or push notifications.
 
 ## Data Model
@@ -26,9 +27,12 @@
 - [x] Week storage uses `target_week_start_date`, not week numbers.
 - [x] Replacement/redraw outcomes include both-member agreement.
 - [x] V0 uses per-member activity bans instead of unavailable time windows.
+- [x] Local storage persists activities, scheduled sessions, outcomes, weekly activity bans, target week, and budget filter.
 
 ## Validation
 
+- [x] `npm ci` passes.
+- [x] `npm test` passes.
 - [x] `npm run build` passes.
 - [x] PR body includes preview note or screenshots.
 - [x] PR body includes build result.
