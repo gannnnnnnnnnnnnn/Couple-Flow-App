@@ -11,6 +11,7 @@ This is the first shared-sync layer for Couple Flow. It is not production-grade 
    - `scheduled_sessions`
    - `session_outcomes`
    - `weekly_activity_bans`
+   - `pair_members`
 4. Copy `.env.example` to `.env.local`.
 5. Fill in:
    - `VITE_SUPABASE_URL`

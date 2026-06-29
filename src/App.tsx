@@ -173,6 +173,7 @@ function App() {
 
     const snapshotData = getCurrentAppData();
 
+    setSyncing(true);
     repository
       .saveSnapshot(snapshotData, pairIdentity)
       .then(({ savedAt, mode }) => {
@@ -181,8 +182,10 @@ function App() {
           setStorageSource('saved');
         }
         setRepositoryMode(mode);
+        setSyncError(null);
       })
-      .catch((error: Error) => setSyncError(error.message));
+      .catch((error: Error) => setSyncError(error.message))
+      .finally(() => setSyncing(false));
   }, [
     activities,
     bans,

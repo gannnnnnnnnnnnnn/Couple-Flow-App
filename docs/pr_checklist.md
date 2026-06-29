@@ -19,6 +19,10 @@
 - [x] Settings / Pair exists.
 - [x] Local-first persistence exists before Supabase.
 - [x] Optional Supabase pair-code sync exists without requiring env vars for demo mode.
+- [x] Supabase setup docs cover schema install, env vars, Realtime replication, restart checks, and troubleshooting.
+- [x] Two-device smoke test docs cover create, join, bidirectional activity sync, scheduled-session sync, outcome sync, and device disconnect.
+- [x] Settings distinguishes local-only, sync-available, connected, syncing, last-saved, and sync-error states.
+- [x] Connected Settings shows the pair code and display name with a copy action.
 - [x] Settings disables demo reset and backup import while connected to a pair.
 - [x] Settings disconnect clears local device data without remote deletes.
 - [x] Activity Pool supports faster mobile quick-add entry.
