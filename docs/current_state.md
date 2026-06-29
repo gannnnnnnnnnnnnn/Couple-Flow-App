@@ -16,7 +16,11 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - When connected to a pair, demo reset and JSON import are disabled so shared Supabase data cannot be accidentally overwritten from Settings.
 - Disconnecting a synced device clears only local device data and pair identity; it does not delete or modify remote pair data.
 - Supabase setup files exist with `.env.example`, `supabase/schema.sql`, and `supabase/README.md`.
+- `docs/supabase_setup.md` documents Supabase project setup, required Realtime replication tables, env vars, restart checks, and common troubleshooting.
+- `docs/two_device_smoke_test.md` documents the intended create-pair, join-pair, shared activity, scheduled session, outcome, and disconnect smoke flow.
 - When Supabase env vars are present, Settings can create or join a V0 pair code with a local display name and stores the current pair/member identity locally.
+- Settings clearly separates local-only, sync-available, connected, syncing, last-saved, and sync-error states.
+- Connected Settings shows the current pair code, display name, status, last saved time, and a copy-code action with a browser clipboard fallback.
 - App data writes through a repository layer with localStorage fallback and Supabase CRUD/realtime support for activities, scheduled sessions, session outcomes, and weekly activity bans.
 - Pair-code join/create hydrates a complete repository snapshot before App autosave resumes, so joining a pair does not overwrite remote data with stale local demo data.
 - Normal Supabase autosave is upsert-only for V0 and intentionally does not delete remote-only rows.
@@ -34,12 +38,12 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Activity Pool supports budget tabs, local add form, and active/paused toggles.
 - Draw Flow filters active eligible activities by budget, activity bans, target-week schedule, and previous-week completed/not-done outcomes.
 - History renders only sessions with outcomes and groups them by week.
-- Settings exposes pair name, timezone, current week, local/sync status, pair-code sync controls, local-safe reset/disconnect controls, and JSON backup import/export.
+- Settings exposes pair name, timezone, current week, local/sync status, visible connected pair-code details, local-safe reset/disconnect controls, and JSON backup import/export.
 
 ## Validation
 
 - `npm ci` passed on 2026-06-29.
-- `npm test` passed on 2026-06-29: 7 files, 27 tests.
+- `npm test` passed on 2026-06-29: 7 files, 30 tests.
 - `npm run build` passed on 2026-06-29.
 
 ## Known Gaps
@@ -49,3 +53,4 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Remote deletes are intentionally deferred until an explicit user action and stricter server rules exist.
 - Agreement enforcement is represented in UI state and outcome data, not backed by server rules.
 - Offline caching is app-shell-only and has not been tuned for runtime data.
+- Pair-code sharing is copy-only; V0 intentionally does not include invitation management.
