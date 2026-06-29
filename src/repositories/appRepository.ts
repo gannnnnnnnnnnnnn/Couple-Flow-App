@@ -128,7 +128,7 @@ export class LocalAppRepository implements AppRepository {
       pairId: demoPair.id,
       memberId: demoMembers[0]?.id ?? 'member-local',
       pairCode: 'LOCAL',
-      displayName: displayName.trim() || demoMembers[0]?.display_name || 'Me',
+      displayName: displayName.trim() || demoMembers[0]?.display_name || '我',
     };
     savePairIdentity(identity);
     saveLocalAppData(currentData);
@@ -144,7 +144,7 @@ export class LocalAppRepository implements AppRepository {
       pairId: demoPair.id,
       memberId: demoMembers[0]?.id ?? 'member-local',
       pairCode: normalizePairCode(pairCode) || 'LOCAL',
-      displayName: displayName.trim() || demoMembers[0]?.display_name || 'Me',
+      displayName: displayName.trim() || demoMembers[0]?.display_name || '我',
     };
     savePairIdentity(identity);
     return {
@@ -230,7 +230,7 @@ export class SupabaseAppRepository implements AppRepository {
     const createdAt = new Date().toISOString();
     const pair: SupabasePair = {
       id: pairId,
-      name: `${displayName.trim() || 'Couple'}'s pair`,
+      name: `${displayName.trim() || '我们'}的双人空间`,
       pair_code: pairCode,
       timezone: demoPair.timezone,
       created_at: createdAt,
@@ -238,7 +238,7 @@ export class SupabaseAppRepository implements AppRepository {
     const member: PairMember = {
       id: memberId,
       pair_id: pairId,
-      display_name: displayName.trim() || 'Me',
+      display_name: displayName.trim() || '我',
       color: MEMBER_COLORS[0],
       created_at: createdAt,
     };
@@ -268,7 +268,7 @@ export class SupabaseAppRepository implements AppRepository {
       .eq('pair_code', normalizedCode)
       .single<SupabasePair>();
     if (error || !pair) {
-      throw new Error('Pair code not found.');
+      throw new Error('没有找到这个配对码。');
     }
 
     const { data: existingMembers, error: membersError } = await this.supabase
@@ -283,7 +283,7 @@ export class SupabaseAppRepository implements AppRepository {
     const member: PairMember = {
       id: createId('member'),
       pair_id: pair.id,
-      display_name: displayName.trim() || 'Me',
+      display_name: displayName.trim() || '我',
       color: MEMBER_COLORS[existingMembers?.length ?? 0] ?? MEMBER_COLORS[0],
       created_at: new Date().toISOString(),
     };
@@ -395,7 +395,7 @@ async function assertNoError<T>(
 ) {
   const { error } = await request;
   if (error) {
-    throw new Error(error.message ?? 'Supabase request failed.');
+    throw new Error(error.message ?? '同步请求失败。');
   }
 }
 

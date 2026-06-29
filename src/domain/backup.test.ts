@@ -44,7 +44,7 @@ describe('app backup import/export', () => {
 
     expect(result).toEqual({
       ok: false,
-      error: 'Backup file does not match Couple Flow data.',
+      error: '备份文件不是 Couple Flow 的可导入数据。',
     });
   });
 });

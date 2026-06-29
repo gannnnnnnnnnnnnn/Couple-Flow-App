@@ -5,22 +5,22 @@ import { BudgetPill, Chip } from './common';
 
 const quickIdeas = [
   {
-    title: 'Dessert walk',
-    note: 'Pick one sweet thing and wander for a bit.',
+    title: '饭后甜品散步',
+    note: '买一样甜的，边走边分着吃。',
     duration: '45',
-    tags: 'outside, sweet',
+    tags: '散步, 甜食',
   },
   {
-    title: 'Tiny grocery challenge',
-    note: 'Buy ingredients for a snack neither of you has made.',
+    title: '小超市挑战',
+    note: '买材料做一个两个人都没试过的小零食。',
     duration: '60',
-    tags: 'food, home',
+    tags: '吃的, 在家',
   },
   {
-    title: 'No-phone coffee',
-    note: 'One drink each, phones away.',
+    title: '无手机咖啡',
+    note: '一人一杯，手机收起来。',
     duration: '40',
-    tags: 'quiet',
+    tags: '安静',
   },
 ];
 
@@ -56,15 +56,15 @@ export function PoolScreen({
     <section className="space-y-4">
       <div className="flex items-end justify-between gap-4">
         <div>
-          <h2 className="text-2xl font-black text-ink">Pool</h2>
+          <h2 className="text-2xl font-black text-ink">活动池</h2>
           <p className="mt-1 text-sm text-ink/60">
-            {activities.filter((activity) => activity.status === 'active').length} active ideas
+            {activities.filter((activity) => activity.status === 'active').length} 个可抽点子
           </p>
         </div>
         <button
           className="grid h-11 w-11 place-items-center rounded-md bg-coral text-cream shadow-soft"
           type="button"
-          title="Add activity"
+          title="添加活动"
           onClick={() => setFormOpen((open) => !open)}
         >
           <ListPlus size={21} />
@@ -73,7 +73,7 @@ export function PoolScreen({
 
       <div className="flex gap-2 overflow-x-auto pb-1">
         <BudgetPill active={budgetFilter === 'all'} onClick={() => setBudgetFilter('all')}>
-          all
+          全部
         </BudgetPill>
         {budgetGroups.map((budget) => (
           <BudgetPill
@@ -99,16 +99,16 @@ export function PoolScreen({
       )}
       {lastAddedTitle && (
         <p className="rounded-md bg-mint/25 px-3 py-2 text-sm font-bold text-ink/70">
-          Added {lastAddedTitle}
+          已加入：{lastAddedTitle}
         </p>
       )}
 
       <div className="space-y-3">
         {visibleActivities.length === 0 && (
           <div className="rounded-md border border-dashed border-ink/16 bg-white/60 p-5 text-center">
-            <p className="font-bold text-ink">No ideas in this budget</p>
+            <p className="font-bold text-ink">这个预算还没有点子</p>
             <p className="mt-1 text-sm leading-5 text-ink/58">
-              Add one here or switch budgets to keep the draw pool useful.
+              加一个新的，或者切到别的预算看看。
             </p>
           </div>
         )}
@@ -124,7 +124,7 @@ export function PoolScreen({
                 <h3 className="text-lg font-bold text-ink">{activity.title}</h3>
                 <p className="mt-1 text-sm leading-5 text-ink/62">{activity.note}</p>
               </div>
-              <Chip>{budgetById.get(activity.budget_group_id)?.name ?? 'open'}</Chip>
+              <Chip>{budgetById.get(activity.budget_group_id)?.name ?? '随意'}</Chip>
             </div>
             <div className="mt-3 flex flex-wrap gap-2">
               {activity.tags.map((tag) => (
@@ -136,7 +136,7 @@ export function PoolScreen({
                 </span>
               ))}
               <span className="rounded-md bg-butter/35 px-2.5 py-1 text-xs font-semibold text-ink/70">
-                {activity.duration_minutes} min
+                {activity.duration_minutes} 分钟
               </span>
             </div>
             <button
@@ -144,7 +144,7 @@ export function PoolScreen({
               type="button"
               onClick={() => onToggleStatus(activity.id)}
             >
-              {activity.status === 'active' ? 'Pause' : 'Reactivate'}
+              {activity.status === 'active' ? '先暂停' : '恢复可抽'}
             </button>
           </article>
         ))}
@@ -186,7 +186,7 @@ function AddActivityForm({
       id: `activity-${Date.now()}`,
       pair_id: pairId,
       title: title.trim(),
-      note: note.trim() || 'A fresh idea from the pool.',
+      note: note.trim() || '一个新鲜的小点子。',
       budget_group_id: budgetId,
       duration_minutes: Number(duration) || 60,
       tags: tags
@@ -220,13 +220,13 @@ function AddActivityForm({
         </div>
         <input
           className="h-11 rounded-md border border-cream/10 bg-cream px-3 text-sm text-ink"
-          placeholder="Title"
+          placeholder="活动名"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
         <input
           className="h-11 rounded-md border border-cream/10 bg-cream px-3 text-sm text-ink"
-          placeholder="Note, optional"
+          placeholder="备注，可不填"
           value={note}
           onChange={(event) => setNote(event.target.value)}
         />
@@ -252,7 +252,7 @@ function AddActivityForm({
         </div>
         <input
           className="h-11 rounded-md border border-cream/10 bg-cream px-3 text-sm text-ink"
-          placeholder="tags, optional"
+          placeholder="标签，可不填"
           value={tags}
           onChange={(event) => setTags(event.target.value)}
         />
@@ -262,7 +262,7 @@ function AddActivityForm({
           disabled={!title.trim()}
           onClick={submit}
         >
-          Add to pool
+          加进活动池
         </button>
       </div>
     </div>

@@ -9,17 +9,17 @@ import {
 describe('settings safety copy', () => {
   it('shows local-only device safety copy without Supabase env', () => {
     expect(getSettingsSafetyCopy({ hasRemoteEnv: false, identity: null })).toMatchObject({
-      clearActionLabel: 'Clear this device data',
+      clearActionLabel: '清空本机数据',
       resetDemoDisabled: false,
-      syncStatusLabel: 'Local only: Supabase env missing',
+      syncStatusLabel: '本机模式：未配置同步',
     });
   });
 
   it('shows sync-available copy when env exists but no pair is connected', () => {
     expect(getSettingsSafetyCopy({ hasRemoteEnv: true, identity: null })).toMatchObject({
-      clearActionLabel: 'Clear this device data',
+      clearActionLabel: '清空本机数据',
       resetDemoDisabled: false,
-      syncStatusLabel: 'Sync available, not connected',
+      syncStatusLabel: '可同步，尚未配对',
     });
   });
 
@@ -35,21 +35,21 @@ describe('settings safety copy', () => {
         },
       }),
     ).toMatchObject({
-      clearActionLabel: 'Disconnect this device',
+      clearActionLabel: '断开本设备',
       resetDemoDisabled: true,
-      resetDemoMessage: 'Demo reset is disabled while connected to a pair.',
-      syncStatusLabel: 'Connected to pair code ABC123',
+      resetDemoMessage: '已连接双人空间时不能重置演示数据。',
+      syncStatusLabel: '已连接配对码 ABC123',
     });
   });
 
   it('maps import results without treating cancellation as success', () => {
     expect(getImportResultMessage({ status: 'success' })).toBe(
-      'Backup imported on this device.',
+      '备份已导入这台设备。',
     );
     expect(getImportResultMessage({ status: 'cancelled' })).toBeNull();
     expect(
-      getImportResultMessage({ status: 'error', message: 'Backup file is not valid JSON.' }),
-    ).toBe('Backup file is not valid JSON.');
+      getImportResultMessage({ status: 'error', message: '备份文件不是有效的 JSON。' }),
+    ).toBe('备份文件不是有效的 JSON。');
   });
 
   it('distinguishes local-only, available, and connected runtime sync states', () => {
@@ -62,8 +62,8 @@ describe('settings safety copy', () => {
         syncing: false,
       }),
     ).toMatchObject({
-      detail: 'Local mode is fully usable on this device.',
-      status: 'Local only: Supabase env missing',
+      detail: '这台设备可以完整使用，只是不会同步到另一边。',
+      status: '本机模式：未配置同步',
     });
 
     expect(
@@ -75,7 +75,7 @@ describe('settings safety copy', () => {
         syncing: false,
       }),
     ).toMatchObject({
-      status: 'Sync available, not connected',
+      status: '可同步，尚未配对',
     });
 
     expect(
@@ -92,10 +92,10 @@ describe('settings safety copy', () => {
         syncing: true,
       }),
     ).toMatchObject({
-      detail: 'Pair code ABC123 as A',
+      detail: '配对码 ABC123 · A',
       error: 'Realtime replication is not enabled.',
-      lastSaved: expect.stringContaining('Last saved'),
-      status: 'Syncing',
+      lastSaved: expect.stringContaining('上次保存'),
+      status: '同步中',
     });
   });
 

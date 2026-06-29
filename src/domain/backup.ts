@@ -31,11 +31,11 @@ export function parseAppBackupJson(raw: string): BackupParseResult {
   try {
     parsed = JSON.parse(raw);
   } catch {
-    return { ok: false, error: 'Backup file is not valid JSON.' };
+    return { ok: false, error: '备份文件不是有效的 JSON。' };
   }
 
   if (!isBackupFile(parsed)) {
-    return { ok: false, error: 'Backup file does not match Couple Flow data.' };
+    return { ok: false, error: '备份文件不是 Couple Flow 的可导入数据。' };
   }
 
   return { ok: true, backup: cloneData(parsed) };

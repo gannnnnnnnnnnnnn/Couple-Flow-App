@@ -9,7 +9,8 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Product harness docs are defined.
 - V0 app uses React, TypeScript, Tailwind, Vite, and PWA metadata.
 - Local mock data mirrors the Supabase-ready table names and core fields.
-- Week Board, Activity Pool, Draw Flow, History, and Settings / Pair screens are playable in local state.
+- Week Board, Activity Pool, Draw Flow, History, and Settings / Pair screens are playable in local state with Simplified Chinese user-facing app copy.
+- Local demo budgets, activities, tags, todos, quick-add examples, backup/import messages, pair-code helper copy, sync status copy, and PWA metadata are localized for a natural Chinese mobile app feel.
 - Local app data is persisted in `localStorage` through a small domain layer for activities, scheduled sessions, outcomes, weekly activity bans, target week, and budget filter.
 - First run without saved local data seeds from demo mock data so the phone app is usable immediately.
 - Settings shows local/save/sync status and includes confirmed controls for reset, disconnect, device clear, JSON export, and JSON import.
@@ -19,11 +20,11 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - `docs/supabase_setup.md` documents Supabase project setup, required Realtime replication tables, env vars, restart checks, and common troubleshooting.
 - `docs/two_device_smoke_test.md` documents the intended create-pair, join-pair, shared activity, scheduled session, outcome, and disconnect smoke flow.
 - When Supabase env vars are present, Settings can create or join a V0 pair code with a local display name and stores the current pair/member identity locally.
-- Settings clearly separates local-only, sync-available, connected, syncing, last-saved, and sync-error states.
+- Settings clearly separates local-only, sync-available, connected, delayed syncing, last-saved, and sync-error states.
 - Connected Settings shows the current pair code, display name, status, last saved time, and a copy-code action with a browser clipboard fallback.
 - App data writes through a repository layer with localStorage fallback and Supabase CRUD/realtime support for activities, scheduled sessions, session outcomes, and weekly activity bans.
 - Pair-code join/create hydrates a complete repository snapshot before App autosave resumes, so joining a pair does not overwrite remote data with stale local demo data.
-- Normal Supabase autosave is upsert-only for V0 and intentionally does not delete remote-only rows.
+- Normal Supabase autosave is debounced, upsert-only for V0, suppresses identical realtime-applied snapshots, and intentionally does not delete remote-only rows.
 - Week Board keeps past open sessions visible under Needs Review / Overdue until an outcome is recorded.
 - Replacing or redrawing from Needs Review reschedules follow-up work to the current week by default.
 - Activity Pool supports faster mobile entry with simple required fields, optional note/duration/tags, quick-add examples, clear-after-add, and lightweight success feedback.
@@ -43,7 +44,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Validation
 
 - `npm ci` passed on 2026-06-29.
-- `npm test` passed on 2026-06-29: 7 files, 30 tests.
+- `npm test` passed on 2026-06-29: 8 files, 33 tests.
 - `npm run build` passed on 2026-06-29.
 
 ## Known Gaps

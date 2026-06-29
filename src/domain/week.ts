@@ -51,7 +51,7 @@ export function getPreviousWeekStartDate(weekStartDate: string) {
 
 export function formatWeekLabel(dateString: string) {
   const date = new Date(`${dateString}T00:00:00.000Z`);
-  return new Intl.DateTimeFormat('en-AU', {
+  return new Intl.DateTimeFormat('zh-CN', {
     month: 'short',
     day: 'numeric',
   }).format(date);

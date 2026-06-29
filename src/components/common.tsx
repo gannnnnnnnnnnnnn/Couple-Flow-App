@@ -11,11 +11,11 @@ import type { ReactNode } from 'react';
 export type Screen = 'board' | 'pool' | 'draw' | 'history' | 'settings';
 
 export const navItems = [
-  { id: 'board', label: 'Week', icon: Home },
-  { id: 'pool', label: 'Pool', icon: ListPlus },
-  { id: 'draw', label: 'Draw', icon: Sparkles },
-  { id: 'history', label: 'History', icon: History },
-  { id: 'settings', label: 'Pair', icon: Settings },
+  { id: 'board', label: '本周', icon: Home },
+  { id: 'pool', label: '活动池', icon: ListPlus },
+  { id: 'draw', label: '抽签', icon: Sparkles },
+  { id: 'history', label: '记录', icon: History },
+  { id: 'settings', label: '设置', icon: Settings },
 ] satisfies { id: Screen; label: string; icon: LucideIcon }[];
 
 export function SectionTitle({ title, count }: { title: string; count?: number }) {
