@@ -3,6 +3,27 @@ import { useMemo, useState } from 'react';
 import type { Activity, BudgetFilter, BudgetGroup } from '../types';
 import { BudgetPill, Chip } from './common';
 
+const quickIdeas = [
+  {
+    title: 'Dessert walk',
+    note: 'Pick one sweet thing and wander for a bit.',
+    duration: '45',
+    tags: 'outside, sweet',
+  },
+  {
+    title: 'Tiny grocery challenge',
+    note: 'Buy ingredients for a snack neither of you has made.',
+    duration: '60',
+    tags: 'food, home',
+  },
+  {
+    title: 'No-phone coffee',
+    note: 'One drink each, phones away.',
+    duration: '40',
+    tags: 'quiet',
+  },
+];
+
 export function PoolScreen({
   activities,
   budgetGroups,
@@ -22,6 +43,7 @@ export function PoolScreen({
 }) {
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>('all');
   const [formOpen, setFormOpen] = useState(false);
+  const [lastAddedTitle, setLastAddedTitle] = useState('');
   const visibleActivities = useMemo(
     () =>
       activities.filter(
@@ -70,10 +92,15 @@ export function PoolScreen({
           currentMemberId={currentMemberId}
           onAdd={(activity) => {
             onAddActivity(activity);
-            setFormOpen(false);
+            setLastAddedTitle(activity.title);
           }}
           pairId={pairId}
         />
+      )}
+      {lastAddedTitle && (
+        <p className="rounded-md bg-mint/25 px-3 py-2 text-sm font-bold text-ink/70">
+          Added {lastAddedTitle}
+        </p>
       )}
 
       <div className="space-y-3">
@@ -143,6 +170,13 @@ function AddActivityForm({
   const [duration, setDuration] = useState('60');
   const [tags, setTags] = useState('');
 
+  function applyQuickIdea(idea: (typeof quickIdeas)[number]) {
+    setTitle(idea.title);
+    setNote(idea.note);
+    setDuration(idea.duration);
+    setTags(idea.tags);
+  }
+
   function submit() {
     if (!title.trim() || !budgetId) {
       return;
@@ -163,20 +197,36 @@ function AddActivityForm({
       status: 'active',
       created_at: new Date().toISOString(),
     });
+    setTitle('');
+    setNote('');
+    setDuration('60');
+    setTags('');
   }
 
   return (
     <div className="rounded-md bg-ink p-4 text-cream shadow-soft">
       <div className="grid gap-3">
+        <div className="flex gap-2 overflow-x-auto pb-1">
+          {quickIdeas.map((idea) => (
+            <button
+              key={idea.title}
+              className="h-9 shrink-0 rounded-md bg-cream/12 px-3 text-xs font-bold text-cream/85"
+              type="button"
+              onClick={() => applyQuickIdea(idea)}
+            >
+              {idea.title}
+            </button>
+          ))}
+        </div>
         <input
           className="h-11 rounded-md border border-cream/10 bg-cream px-3 text-sm text-ink"
-          placeholder="Activity title"
+          placeholder="Title"
           value={title}
           onChange={(event) => setTitle(event.target.value)}
         />
         <input
           className="h-11 rounded-md border border-cream/10 bg-cream px-3 text-sm text-ink"
-          placeholder="Note"
+          placeholder="Note, optional"
           value={note}
           onChange={(event) => setNote(event.target.value)}
         />
@@ -195,13 +245,14 @@ function AddActivityForm({
           <input
             className="h-11 rounded-md border border-cream/10 bg-cream px-3 text-sm text-ink"
             inputMode="numeric"
+            placeholder="60"
             value={duration}
             onChange={(event) => setDuration(event.target.value)}
           />
         </div>
         <input
           className="h-11 rounded-md border border-cream/10 bg-cream px-3 text-sm text-ink"
-          placeholder="tags, comma separated"
+          placeholder="tags, optional"
           value={tags}
           onChange={(event) => setTags(event.target.value)}
         />

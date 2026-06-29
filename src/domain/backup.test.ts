@@ -1,0 +1,50 @@
+import { describe, expect, it } from 'vitest';
+import { createDemoLocalAppData } from './localPersistence';
+import { BACKUP_SCHEMA_VERSION, parseAppBackupJson, stringifyAppBackup } from './backup';
+
+describe('app backup import/export', () => {
+  it('exports current app data with metadata', () => {
+    const data = createDemoLocalAppData();
+    const raw = stringifyAppBackup(data, new Date('2026-06-29T12:00:00.000Z'));
+    const parsed = JSON.parse(raw);
+
+    expect(parsed).toMatchObject({
+      app: 'couple-flow',
+      schemaVersion: BACKUP_SCHEMA_VERSION,
+      exportedAt: '2026-06-29T12:00:00.000Z',
+    });
+    expect(parsed.data.activities).toHaveLength(data.activities.length);
+  });
+
+  it('parses a valid backup payload', () => {
+    const data = createDemoLocalAppData();
+    data.targetWeekStart = '2026-07-06';
+
+    const result = parseAppBackupJson(stringifyAppBackup(data));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.backup.data.targetWeekStart).toBe('2026-07-06');
+    }
+  });
+
+  it('rejects invalid JSON', () => {
+    expect(parseAppBackupJson('{nope').ok).toBe(false);
+  });
+
+  it('rejects payloads with the wrong shape', () => {
+    const result = parseAppBackupJson(
+      JSON.stringify({
+        app: 'couple-flow',
+        schemaVersion: BACKUP_SCHEMA_VERSION,
+        exportedAt: '2026-06-29T12:00:00.000Z',
+        data: { activities: [] },
+      }),
+    );
+
+    expect(result).toEqual({
+      ok: false,
+      error: 'Backup file does not match Couple Flow data.',
+    });
+  });
+});

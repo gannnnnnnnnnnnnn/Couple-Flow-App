@@ -6,6 +6,7 @@ import { PoolScreen } from './components/PoolScreen';
 import { SettingsScreen } from './components/SettingsScreen';
 import { WeekBoard } from './components/WeekBoard';
 import type { Screen } from './components/common';
+import { parseAppBackupJson, stringifyAppBackup } from './domain/backup';
 import {
   classifySessions,
   createOutcome,
@@ -214,6 +215,10 @@ function App() {
   }
 
   function resetToDemoData() {
+    if (pairIdentity) {
+      return;
+    }
+
     const confirmed = window.confirm(
       'Reset this phone to the demo Couple Flow data? Your local changes will be replaced.',
     );
@@ -260,7 +265,9 @@ function App() {
 
   function clearLocalUserData() {
     const confirmed = window.confirm(
-      'Clear local user data on this phone? The demo seed will load again so the app stays usable.',
+      pairIdentity
+        ? 'Disconnect this device from the pair? Remote shared pair data will not be deleted or changed.'
+        : 'Clear data saved on this device? Remote pair data will not be affected.',
     );
 
     if (!confirmed) {
@@ -271,6 +278,41 @@ function App() {
     setPairIdentity(null);
     setLastSavedAt(null);
     replaceLocalState();
+  }
+
+  function exportAppData() {
+    const raw = stringifyAppBackup(getCurrentAppData());
+    const blob = new Blob([raw], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `couple-flow-backup-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+  }
+
+  async function importAppData(file: File) {
+    if (pairIdentity) {
+      return 'Import is disabled while connected to a pair.';
+    }
+
+    const raw = await file.text();
+    const result = parseAppBackupJson(raw);
+    if (!result.ok) {
+      return result.error;
+    }
+
+    const confirmed = window.confirm(
+      'Import this backup on this device? It will replace local activities, plans, outcomes, bans, target week, and budget filter. Remote pair data will not be affected.',
+    );
+    if (!confirmed) {
+      return null;
+    }
+
+    replaceLocalState(result.backup.data);
+    return null;
   }
 
   function changeTargetWeek(weekStart: string) {
@@ -488,6 +530,8 @@ function App() {
           }}
           onCreatePair={createPairCode}
           onClearLocalData={clearLocalUserData}
+          onExportData={exportAppData}
+          onImportData={importAppData}
           onJoinPair={joinPairCode}
           onResetDemoData={resetToDemoData}
         />

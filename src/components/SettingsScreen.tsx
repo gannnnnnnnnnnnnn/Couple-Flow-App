@@ -1,17 +1,20 @@
 import {
   CalendarDays,
   Check,
+  Download,
   Clock3,
   Heart,
   Link2,
   RotateCcw,
   Trash2,
+  Upload,
   Wifi,
   WifiOff,
 } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import type { LocalStateSource, PairIdentity } from '../domain/localPersistence';
+import { getSettingsSafetyCopy } from '../domain/settingsSafety';
 import type { Pair } from '../types';
 import type { RepositoryMode } from '../repositories/appRepository';
 
@@ -25,6 +28,8 @@ export function SettingsScreen({
   storageStatus,
   onCreatePair,
   onClearLocalData,
+  onExportData,
+  onImportData,
   onJoinPair,
   onResetDemoData,
 }: {
@@ -47,11 +52,19 @@ export function SettingsScreen({
   };
   onCreatePair: (displayName: string) => Promise<void>;
   onClearLocalData: () => void;
+  onExportData: () => void;
+  onImportData: (file: File) => Promise<string | null>;
   onJoinPair: (pairCode: string, displayName: string) => Promise<void>;
   onResetDemoData: () => void;
 }) {
+  const importInputRef = useRef<HTMLInputElement>(null);
   const [displayName, setDisplayName] = useState(syncStatus.identity?.displayName ?? '');
+  const [importMessage, setImportMessage] = useState<string | null>(null);
   const [pairCode, setPairCode] = useState('');
+  const safetyCopy = getSettingsSafetyCopy({
+    hasRemoteEnv: syncStatus.hasRemoteEnv,
+    identity: syncStatus.identity,
+  });
   const savedLabel = storageStatus.canPersist
     ? storageStatus.savedAt
       ? `Saved ${new Date(storageStatus.savedAt).toLocaleTimeString([], {
@@ -65,11 +78,19 @@ export function SettingsScreen({
     : storageStatus.source === 'demo'
       ? 'Demo seeded'
       : savedLabel;
-  const syncValue = !syncStatus.hasRemoteEnv
-    ? 'Local demo'
-    : syncStatus.identity
-      ? `Pair ${syncStatus.identity.pairCode}`
-      : 'Supabase ready';
+  const syncValue = safetyCopy.syncStatusLabel;
+
+  async function handleImport(file: File | undefined) {
+    if (!file) {
+      return;
+    }
+
+    const error = await onImportData(file);
+    setImportMessage(error ?? 'Backup imported on this device.');
+    if (importInputRef.current) {
+      importInputRef.current.value = '';
+    }
+  }
 
   return (
     <section className="space-y-4">
@@ -145,7 +166,7 @@ export function SettingsScreen({
           </button>
           {!syncStatus.hasRemoteEnv && (
             <p className="rounded-md bg-cream px-3 py-2 text-xs font-semibold text-ink/58">
-              Add Supabase env vars to enable shared sync. Local demo mode stays available.
+              Sync setup is not configured on this build. Add Supabase env vars to enable pair codes; local mode still works.
             </p>
           )}
           {syncStatus.identity && (
@@ -169,20 +190,61 @@ export function SettingsScreen({
         </p>
         <div className="mt-4 grid gap-2">
           <button
-            className="flex h-11 items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-bold text-cream"
+            className="flex h-11 items-center justify-center gap-2 rounded-md bg-mint/35 px-4 text-sm font-bold text-ink"
             type="button"
+            onClick={onExportData}
+          >
+            <Download size={17} />
+            Export JSON backup
+          </button>
+          <input
+            ref={importInputRef}
+            className="hidden"
+            type="file"
+            accept="application/json,.json"
+            onChange={(event) => void handleImport(event.target.files?.[0])}
+          />
+          <button
+            className="flex h-11 items-center justify-center gap-2 rounded-md bg-cream px-4 text-sm font-bold text-ink/70 disabled:opacity-40"
+            type="button"
+            disabled={Boolean(syncStatus.identity)}
+            onClick={() => importInputRef.current?.click()}
+          >
+            <Upload size={17} />
+            Import JSON backup
+          </button>
+          {syncStatus.identity && (
+            <p className="rounded-md bg-cream px-3 py-2 text-xs font-semibold text-ink/58">
+              Import is disabled while connected to a pair to avoid overwriting shared sync data.
+            </p>
+          )}
+          {importMessage && (
+            <p className="rounded-md bg-mint/20 px-3 py-2 text-xs font-bold text-ink/70">
+              {importMessage}
+            </p>
+          )}
+          <button
+            className="flex h-11 items-center justify-center gap-2 rounded-md bg-ink px-4 text-sm font-bold text-cream disabled:opacity-40"
+            type="button"
+            disabled={safetyCopy.resetDemoDisabled}
             onClick={onResetDemoData}
           >
             <RotateCcw size={17} />
             Reset to demo data
           </button>
+          {safetyCopy.resetDemoMessage && (
+            <p className="rounded-md bg-cream px-3 py-2 text-xs font-semibold text-ink/58">
+              {safetyCopy.resetDemoMessage}
+            </p>
+          )}
           <button
             className="flex h-11 items-center justify-center gap-2 rounded-md bg-cream px-4 text-sm font-bold text-ink/70"
             type="button"
             onClick={onClearLocalData}
+            title={safetyCopy.clearConfirmation}
           >
             <Trash2 size={17} />
-            Clear local user data
+            {safetyCopy.clearActionLabel}
           </button>
         </div>
       </div>
