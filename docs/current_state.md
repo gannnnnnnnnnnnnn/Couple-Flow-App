@@ -19,6 +19,9 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Supabase setup files exist with `.env.example`, `supabase/schema.sql`, and `supabase/README.md`.
 - `docs/supabase_setup.md` documents Supabase project setup, required Realtime replication tables, env vars, restart checks, and common troubleshooting.
 - `docs/two_device_smoke_test.md` documents the intended create-pair, join-pair, shared activity, scheduled session, outcome, and disconnect smoke flow.
+- `docs/deployment.md` documents Vercel deployment with the Vite preset, `npm run build`, `dist`, Supabase environment variables, and phone home-screen setup.
+- `docs/phone_usage.md` documents the two-phone public-URL flow, pair-code create/join, network expectations, and add-to-home-screen usage.
+- `vercel.json` rewrites browser refreshes back to the Vite app shell.
 - When Supabase env vars are present, Settings can create or join a V0 pair code with a local display name and stores the current pair/member identity locally.
 - Settings clearly separates local-only, sync-available, connected, delayed syncing, last-saved, and sync-error states.
 - Connected Settings shows the current pair code, display name, status, last saved time, and a copy-code action with a browser clipboard fallback.
@@ -50,6 +53,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Known Gaps
 
 - Supabase is optional and only enabled by local env vars.
+- Public deployment still requires the deployer to add Supabase environment variables in Vercel when pair-code sync is desired.
 - Pair-code sync is not production-grade auth; no email auth or real invite security exists yet.
 - Remote deletes are intentionally deferred until an explicit user action and stricter server rules exist.
 - Agreement enforcement is represented in UI state and outcome data, not backed by server rules.

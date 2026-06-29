@@ -22,6 +22,9 @@
 - [x] Optional Supabase pair-code sync exists without requiring env vars for demo mode.
 - [x] Supabase setup docs cover schema install, env vars, Realtime replication, restart checks, and troubleshooting.
 - [x] Two-device smoke test docs cover create, join, bidirectional activity sync, scheduled-session sync, outcome sync, and device disconnect.
+- [x] Vercel deployment docs cover Vite preset, build command, output directory, env vars, and phone install.
+- [x] Phone usage docs cover same-URL pairing, no shared Wi-Fi requirement, network expectations, and add-to-home-screen.
+- [x] Vercel SPA refreshes route back to the app shell.
 - [x] Settings distinguishes local-only, sync-available, connected, syncing, last-saved, and sync-error states.
 - [x] Connected Settings shows the pair code and display name with a copy action.
 - [x] Settings disables demo reset and backup import while connected to a pair.
@@ -44,6 +47,8 @@
 - [x] Pair-code create intentionally migrates current local state once.
 - [x] Normal Supabase autosave is upsert-only and does not delete remote-only rows.
 - [x] Autosave is debounced and skips immediate saves after identical remote snapshots are applied.
+- [x] `.env.example` contains placeholders only.
+- [x] `.gitignore` excludes `.env`, `.env.local`, and `.env.*.local`.
 
 ## Validation
 
