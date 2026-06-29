@@ -1,0 +1,17 @@
+{
+  "name": "Couple Flow",
+  "short_name": "Couple Flow",
+  "description": "A playful weekly planning board for couples.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#fff9f1",
+  "theme_color": "#f97362",
+  "icons": [
+    {
+      "src": "/icons/icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
