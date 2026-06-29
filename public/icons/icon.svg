@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" role="img" aria-labelledby="title">
+  <title>Couple Flow</title>
+  <rect width="128" height="128" rx="28" fill="#fff9f1"/>
+  <path d="M35 63c0-17 12-30 29-30s29 13 29 30-12 32-29 32-29-15-29-32Z" fill="#f97362"/>
+  <path d="M26 73c0-14 10-25 24-25s24 11 24 25-10 27-24 27-24-13-24-27Z" fill="#7ad7bd" opacity=".86"/>
+  <path d="M51 65c4-8 15-8 19 0 4-8 15-8 19 0 4 10-10 20-19 27-9-7-23-17-19-27Z" fill="#fff9f1"/>
+</svg>
