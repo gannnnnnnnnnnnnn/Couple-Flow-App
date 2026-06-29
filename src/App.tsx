@@ -15,13 +15,17 @@ import {
 } from './domain/state';
 import { getNextWeekStartDate, getWeekStartDate } from './domain/week';
 import {
-  clearLocalAppData,
   createDemoLocalAppData,
   loadLocalAppData,
-  saveLocalAppData,
   type LocalStateLoadResult,
   type LocalStateSource,
+  type PairIdentity,
 } from './domain/localPersistence';
+import {
+  createAppRepository,
+  type RepositoryMode,
+  type RepositorySnapshot,
+} from './repositories/appRepository';
 import {
   budgetGroups,
   members,
@@ -30,6 +34,9 @@ import {
 import type {
   Activity,
   BudgetFilter,
+  BudgetGroup,
+  Pair,
+  PairMember,
   Rating,
   ScheduledSession,
   SessionOutcome,
@@ -41,8 +48,12 @@ function getInitialLocalState(): LocalStateLoadResult {
 }
 
 function App() {
+  const repository = useMemo(() => createAppRepository(), []);
   const initialLocalState = useMemo(() => getInitialLocalState(), []);
   const [activeScreen, setActiveScreen] = useState<Screen>('board');
+  const [activePair, setActivePair] = useState<Pair>(pair);
+  const [activeMembers, setActiveMembers] = useState<PairMember[]>(members);
+  const [activeBudgetGroups, setActiveBudgetGroups] = useState<BudgetGroup[]>(budgetGroups);
   const [activities, setActivities] = useState<Activity[]>(
     initialLocalState.data.activities,
   );
@@ -68,10 +79,14 @@ function App() {
   const [lastSavedAt, setLastSavedAt] = useState<string | null>(
     initialLocalState.savedAt,
   );
+  const [pairIdentity, setPairIdentity] = useState<PairIdentity | null>(null);
+  const [repositoryMode, setRepositoryMode] = useState<RepositoryMode>(repository.mode);
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<string | null>(null);
 
   const currentWeekStart = useMemo(
-    () => getWeekStartDate(new Date(), pair.timezone),
-    [],
+    () => getWeekStartDate(new Date(), activePair.timezone),
+    [activePair.timezone],
   );
   const nextWeekStart = useMemo(
     () => getNextWeekStartDate(currentWeekStart),
@@ -84,8 +99,8 @@ function App() {
     [activities],
   );
   const budgetById = useMemo(
-    () => new Map(budgetGroups.map((budget) => [budget.id, budget])),
-    [],
+    () => new Map(activeBudgetGroups.map((budget) => [budget.id, budget])),
+    [activeBudgetGroups],
   );
   const outcomeBySessionId = useMemo(() => getOutcomeBySessionId(outcomes), [outcomes]);
   const { needsReviewSessions, ongoingSessions, planningSessions, historySessions } = useMemo(
@@ -93,21 +108,84 @@ function App() {
     [currentWeekStart, outcomes, scheduledSessions],
   );
 
+  const activePairId = pairIdentity?.pairId ?? activePair.id;
+  const activeMemberId = pairIdentity?.memberId ?? activeMembers[0]?.id ?? 'member-local';
+
+  function applySnapshot(snapshot: RepositorySnapshot) {
+    setActivities(snapshot.data.activities);
+    setScheduledSessions(snapshot.data.scheduledSessions);
+    setOutcomes(snapshot.data.outcomes);
+    setBans(snapshot.data.weeklyActivityBans);
+    setTargetWeekStart(snapshot.data.targetWeekStart);
+    setBudgetFilter(snapshot.data.budgetFilter);
+    setStorageSource(snapshot.source);
+    setLastSavedAt(snapshot.savedAt);
+    setActivePair(snapshot.pair);
+    setActiveMembers(snapshot.members);
+    setActiveBudgetGroups(snapshot.budgetGroups);
+    setPairIdentity(snapshot.identity);
+    setRepositoryMode(snapshot.mode);
+  }
+
   useEffect(() => {
-    const savedAt = saveLocalAppData({
+    let cancelled = false;
+
+    repository
+      .loadSnapshot()
+      .then((snapshot) => {
+        if (!cancelled) {
+          applySnapshot(snapshot);
+        }
+      })
+      .catch((error: Error) => {
+        if (!cancelled) {
+          setSyncError(error.message);
+        }
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [repository]);
+
+  useEffect(() => {
+    const snapshotData = {
       activities,
       scheduledSessions,
       outcomes,
       weeklyActivityBans: bans,
       targetWeekStart,
       budgetFilter,
-    });
+    };
 
-    if (savedAt) {
-      setLastSavedAt(savedAt);
-      setStorageSource('saved');
+    repository
+      .saveSnapshot(snapshotData, pairIdentity)
+      .then(({ savedAt, mode }) => {
+        if (savedAt) {
+          setLastSavedAt(savedAt);
+          setStorageSource('saved');
+        }
+        setRepositoryMode(mode);
+      })
+      .catch((error: Error) => setSyncError(error.message));
+  }, [
+    activities,
+    bans,
+    budgetFilter,
+    outcomes,
+    pairIdentity,
+    repository,
+    scheduledSessions,
+    targetWeekStart,
+  ]);
+
+  useEffect(() => {
+    if (!pairIdentity || repository.mode !== 'supabase') {
+      return undefined;
     }
-  }, [activities, bans, budgetFilter, outcomes, scheduledSessions, targetWeekStart]);
+
+    return repository.subscribeToPair(pairIdentity, applySnapshot);
+  }, [pairIdentity, repository]);
 
   function replaceLocalState(data = createDemoLocalAppData()) {
     setActivities(data.activities);
@@ -133,6 +211,34 @@ function App() {
     replaceLocalState();
   }
 
+  async function createPairCode(displayName: string) {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const identity = await repository.createPair(displayName);
+      setPairIdentity(identity);
+      applySnapshot(await repository.loadSnapshot());
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : 'Could not create pair code.');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
+  async function joinPairCode(pairCode: string, displayName: string) {
+    setSyncing(true);
+    setSyncError(null);
+    try {
+      const identity = await repository.joinPair(pairCode, displayName);
+      setPairIdentity(identity);
+      applySnapshot(await repository.loadSnapshot());
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : 'Could not join pair code.');
+    } finally {
+      setSyncing(false);
+    }
+  }
+
   function clearLocalUserData() {
     const confirmed = window.confirm(
       'Clear local user data on this phone? The demo seed will load again so the app stays usable.',
@@ -142,7 +248,8 @@ function App() {
       return;
     }
 
-    clearLocalAppData();
+    repository.clearLocalData();
+    setPairIdentity(null);
     setLastSavedAt(null);
     replaceLocalState();
   }
@@ -184,7 +291,7 @@ function App() {
         ...currentBans,
         {
           id: `ban-${drawSessionId}-${memberId}-${activityId}`,
-          pair_id: pair.id,
+          pair_id: activePairId,
           draw_session_id: drawSessionId,
           member_id: memberId,
           activity_id: activityId,
@@ -199,7 +306,7 @@ function App() {
     const session = createScheduledSession(
       activity,
       `draw-${selectedTargetWeek}`,
-      pair.id,
+      activePairId,
       selectedTargetWeek,
       currentWeekStart,
     );
@@ -233,7 +340,7 @@ function App() {
       ...currentOutcomes,
       createOutcome(session, 'replaced', {
         replacementActivityId,
-        agreedByMemberIds: members.map((member) => member.id),
+        agreedByMemberIds: activeMembers.map((member) => member.id),
       }),
     ]);
     const followUpTargetWeek = getFollowUpTargetWeek(session, currentWeekStart);
@@ -243,7 +350,7 @@ function App() {
       createScheduledSession(
         replacement,
         `manual-replace-${session.id}`,
-        pair.id,
+        activePairId,
         followUpTargetWeek,
         currentWeekStart,
       ),
@@ -256,7 +363,7 @@ function App() {
     setOutcomes((currentOutcomes) => [
       ...currentOutcomes,
       createOutcome(session, 'redrawn', {
-        agreedByMemberIds: members.map((member) => member.id),
+        agreedByMemberIds: activeMembers.map((member) => member.id),
       }),
     ]);
     setTargetWeekStart(followUpTargetWeek);
@@ -279,14 +386,19 @@ function App() {
   }
 
   return (
-    <AppShell activeScreen={activeScreen} onNavigate={setActiveScreen}>
+    <AppShell
+      activeScreen={activeScreen}
+      members={activeMembers}
+      onNavigate={setActiveScreen}
+      pair={activePair}
+    >
       {activeScreen === 'board' && (
         <WeekBoard
           activityById={activityById}
           activities={activities}
           budgetById={budgetById}
           currentWeekStart={currentWeekStart}
-          members={members}
+          members={activeMembers}
           needsReviewSessions={needsReviewSessions}
           ongoingSessions={ongoingSessions}
           planningSessions={planningSessions}
@@ -300,11 +412,11 @@ function App() {
       {activeScreen === 'draw' && (
         <DrawScreen
           activities={activities}
-          budgetGroups={budgetGroups}
+          budgetGroups={activeBudgetGroups}
           budgetById={budgetById}
           currentWeekStart={currentWeekStart}
           nextWeekStart={nextWeekStart}
-          members={members}
+          members={activeMembers}
           scheduledSessions={scheduledSessions}
           outcomes={outcomes}
           bans={bans}
@@ -321,8 +433,10 @@ function App() {
       {activeScreen === 'pool' && (
         <PoolScreen
           activities={activities}
-          budgetGroups={budgetGroups}
+          budgetGroups={activeBudgetGroups}
           budgetById={budgetById}
+          currentMemberId={activeMemberId}
+          pairId={activePairId}
           onAddActivity={addActivity}
           onToggleStatus={toggleActivityStatus}
         />
@@ -336,16 +450,26 @@ function App() {
       )}
       {activeScreen === 'settings' && (
         <SettingsScreen
+          pair={activePair}
           currentWeekStart={currentWeekStart}
           ongoingCount={ongoingSessions.length}
           planningCount={planningSessions.length}
           needsReviewCount={needsReviewSessions.length}
+          syncStatus={{
+            error: syncError,
+            hasRemoteEnv: repository.hasRemoteEnv,
+            identity: pairIdentity,
+            mode: repositoryMode,
+            syncing,
+          }}
           storageStatus={{
             canPersist: initialLocalState.canPersist,
             source: storageSource,
             savedAt: lastSavedAt,
           }}
+          onCreatePair={createPairCode}
           onClearLocalData={clearLocalUserData}
+          onJoinPair={joinPairCode}
           onResetDemoData={resetToDemoData}
         />
       )}

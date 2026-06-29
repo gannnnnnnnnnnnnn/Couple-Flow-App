@@ -13,6 +13,7 @@ import type {
 } from '../types';
 
 export const LOCAL_STATE_STORAGE_KEY = 'couple-flow.local-state.v1';
+export const PAIR_IDENTITY_STORAGE_KEY = 'couple-flow.pair-identity.v1';
 
 export interface LocalAppData {
   activities: Activity[];
@@ -42,6 +43,13 @@ export interface LocalStateLoadResult {
   source: LocalStateSource;
   savedAt: string | null;
   canPersist: boolean;
+}
+
+export interface PairIdentity {
+  pairId: string;
+  memberId: string;
+  pairCode: string;
+  displayName: string;
 }
 
 function cloneData<T>(data: T): T {
@@ -153,6 +161,45 @@ export function clearLocalAppData(storage: StorageLike | null = getBrowserStorag
   }
 }
 
+export function loadPairIdentity(
+  storage: StorageLike | null = getBrowserStorage(),
+): PairIdentity | null {
+  if (!storage) {
+    return null;
+  }
+
+  try {
+    const raw = storage.getItem(PAIR_IDENTITY_STORAGE_KEY);
+    if (!raw) {
+      return null;
+    }
+
+    const parsed: unknown = JSON.parse(raw);
+    return isPairIdentity(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+export function savePairIdentity(
+  identity: PairIdentity,
+  storage: StorageLike | null = getBrowserStorage(),
+) {
+  try {
+    storage?.setItem(PAIR_IDENTITY_STORAGE_KEY, JSON.stringify(identity));
+  } catch {
+    return;
+  }
+}
+
+export function clearPairIdentity(storage: StorageLike | null = getBrowserStorage()) {
+  try {
+    storage?.removeItem(PAIR_IDENTITY_STORAGE_KEY);
+  } catch {
+    return;
+  }
+}
+
 export function parsePersistedLocalAppData(raw: string): PersistedLocalAppData | null {
   try {
     const parsed: unknown = JSON.parse(raw);
@@ -192,5 +239,19 @@ function isLocalAppData(value: unknown): value is LocalAppData {
     Array.isArray(candidate.weeklyActivityBans) &&
     typeof candidate.targetWeekStart === 'string' &&
     typeof candidate.budgetFilter === 'string'
+  );
+}
+
+function isPairIdentity(value: unknown): value is PairIdentity {
+  if (!value || typeof value !== 'object') {
+    return false;
+  }
+
+  const candidate = value as Partial<PairIdentity>;
+  return (
+    typeof candidate.pairId === 'string' &&
+    typeof candidate.memberId === 'string' &&
+    typeof candidate.pairCode === 'string' &&
+    typeof candidate.displayName === 'string'
   );
 }

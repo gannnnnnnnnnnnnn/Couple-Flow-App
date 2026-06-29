@@ -18,6 +18,7 @@
 - [x] History exists.
 - [x] Settings / Pair exists.
 - [x] Local-first persistence exists before Supabase.
+- [x] Optional Supabase pair-code sync exists without requiring env vars for demo mode.
 - [x] No photos, maps, payments, or push notifications.
 
 ## Data Model
@@ -28,6 +29,8 @@
 - [x] Replacement/redraw outcomes include both-member agreement.
 - [x] V0 uses per-member activity bans instead of unavailable time windows.
 - [x] Local storage persists activities, scheduled sessions, outcomes, weekly activity bans, target week, and budget filter.
+- [x] Supabase schema includes pairs, pair members, budget groups, activities, draw sessions, weekly activity bans, scheduled sessions, and session outcomes.
+- [x] Repository layer preserves localStorage fallback and keeps Supabase calls out of UI leaf components.
 
 ## Validation
 
