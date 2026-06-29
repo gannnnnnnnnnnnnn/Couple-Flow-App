@@ -18,12 +18,15 @@ import {
   classifySessions,
   createOutcome,
   createScheduledSession,
+  deleteOrPauseActivity,
   getFollowUpTargetWeek,
   getOutcomeBySessionId,
+  isActivityReferenced,
 } from './domain/state';
 import { getNextWeekStartDate, getWeekStartDate } from './domain/week';
 import {
   createDemoLocalAppData,
+  enableDemoSeed,
   loadLocalAppData,
   type LocalStateLoadResult,
   type LocalStateSource,
@@ -111,6 +114,17 @@ function App() {
     () => new Map(activities.map((activity) => [activity.id, activity])),
     [activities],
   );
+  const referencedActivityIds = useMemo(
+    () =>
+      new Set(
+        activities
+          .filter((activity) =>
+            isActivityReferenced(activity.id, scheduledSessions, outcomes, bans),
+          )
+          .map((activity) => activity.id),
+      ),
+    [activities, bans, outcomes, scheduledSessions],
+  );
   const budgetById = useMemo(
     () => new Map(activeBudgetGroups.map((budget) => [budget.id, budget])),
     [activeBudgetGroups],
@@ -144,6 +158,7 @@ function App() {
     setActiveBudgetGroups(snapshot.budgetGroups);
     setPairIdentity(snapshot.identity);
     setRepositoryMode(snapshot.mode);
+    setDrawResults([]);
   }
 
   function getCurrentAppData(): LocalAppData {
@@ -266,7 +281,7 @@ function App() {
     return repository.subscribeToPair(pairIdentity, (snapshot) => applySnapshot(snapshot));
   }, [pairIdentity, repository]);
 
-  function replaceLocalState(data = createDemoLocalAppData()) {
+  function replaceLocalState(data = createDemoLocalAppData(), source: LocalStateSource = 'demo') {
     setActivities(data.activities);
     setScheduledSessions(data.scheduledSessions);
     setOutcomes(data.outcomes);
@@ -275,7 +290,7 @@ function App() {
     setBudgetFilter(data.budgetFilter);
     setDrawResults([]);
     setActiveScreen('board');
-    setStorageSource('demo');
+    setStorageSource(source);
   }
 
   function resetToDemoData() {
@@ -291,7 +306,34 @@ function App() {
       return;
     }
 
+    enableDemoSeed();
     replaceLocalState();
+  }
+
+  async function startFromScratch() {
+    const confirmed = window.confirm(
+      pairIdentity
+        ? '确定要清空这个双人空间的数据吗？这会删除两个人共享的活动、计划、屏蔽项和记录，但会保留配对码和成员。'
+        : '要从空白开始吗？这会清空本机演示活动、计划和记录，但不会影响云端数据。',
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setSyncing(true);
+    setHydrating(true);
+    setSyncError(null);
+    try {
+      const snapshot = await repository.startFromScratch(pairIdentity);
+      applySnapshot(snapshot);
+      setActiveScreen('pool');
+    } catch (error) {
+      setSyncError(error instanceof Error ? error.message : '清空数据失败。');
+    } finally {
+      setHydrating(false);
+      setSyncing(false);
+    }
   }
 
   async function createPairCode(displayName: string) {
@@ -513,6 +555,33 @@ function App() {
     );
   }
 
+  function updateActivity(updatedActivity: Activity) {
+    setActivities((currentActivities) =>
+      currentActivities.map((activity) =>
+        activity.id === updatedActivity.id ? updatedActivity : activity,
+      ),
+    );
+  }
+
+  function removeActivity(activityId: string) {
+    if (!referencedActivityIds.has(activityId)) {
+      const confirmed = window.confirm('确定删除这个活动吗？');
+      if (!confirmed) {
+        return;
+      }
+    }
+
+    const result = deleteOrPauseActivity({
+      activityId,
+      activities,
+      scheduledSessions,
+      outcomes,
+      weeklyActivityBans: bans,
+    });
+    setActivities(result.activities);
+    setBans(result.weeklyActivityBans);
+  }
+
   return (
     <AppShell
       activeScreen={activeScreen}
@@ -566,7 +635,10 @@ function App() {
           currentMemberId={activeMemberId}
           pairId={activePairId}
           onAddActivity={addActivity}
+          onDeleteActivity={removeActivity}
+          onUpdateActivity={updateActivity}
           onToggleStatus={toggleActivityStatus}
+          referencedActivityIds={referencedActivityIds}
         />
       )}
       {activeScreen === 'history' && (
@@ -601,6 +673,7 @@ function App() {
           onImportData={importAppData}
           onJoinPair={joinPairCode}
           onResetDemoData={resetToDemoData}
+          onStartFromScratch={startFromScratch}
         />
       )}
     </AppShell>

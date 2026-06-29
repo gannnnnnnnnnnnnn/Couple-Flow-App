@@ -11,9 +11,12 @@ import type {
   SessionOutcome,
   WeeklyActivityBan,
 } from '../types';
+import { getNextWeekStartDate, getWeekStartDate } from './week';
 
 export const LOCAL_STATE_STORAGE_KEY = 'couple-flow.local-state.v1';
 export const PAIR_IDENTITY_STORAGE_KEY = 'couple-flow.pair-identity.v1';
+export const DEMO_DISABLED_STORAGE_KEY = 'couple-flow.demo-disabled.v1';
+const DEFAULT_PAIR_TIMEZONE = 'Australia/Melbourne';
 
 export interface LocalAppData {
   activities: Activity[];
@@ -36,7 +39,7 @@ export interface StorageLike {
   removeItem(key: string): void;
 }
 
-export type LocalStateSource = 'saved' | 'demo';
+export type LocalStateSource = 'saved' | 'demo' | 'empty';
 
 export interface LocalStateLoadResult {
   data: LocalAppData;
@@ -67,6 +70,17 @@ export function createDemoLocalAppData(): LocalAppData {
   };
 }
 
+export function createEmptyLocalAppData(now = new Date()): LocalAppData {
+  return {
+    activities: [],
+    scheduledSessions: [],
+    outcomes: [],
+    weeklyActivityBans: [],
+    targetWeekStart: getNextWeekStartDate(getWeekStartDate(now, DEFAULT_PAIR_TIMEZONE)),
+    budgetFilter: 'all',
+  };
+}
+
 export function getBrowserStorage(): StorageLike | null {
   if (typeof window === 'undefined') {
     return null;
@@ -92,8 +106,10 @@ export function loadLocalAppData(
   }
 
   let raw: string | null;
+  let demoDisabled = false;
   try {
     raw = storage.getItem(LOCAL_STATE_STORAGE_KEY);
+    demoDisabled = isDemoSeedDisabled(storage);
   } catch {
     return {
       data: createDemoLocalAppData(),
@@ -103,6 +119,15 @@ export function loadLocalAppData(
     };
   }
   if (!raw) {
+    if (demoDisabled) {
+      return {
+        data: createEmptyLocalAppData(),
+        source: 'empty',
+        savedAt: null,
+        canPersist: true,
+      };
+    }
+
     return {
       data: createDemoLocalAppData(),
       source: 'demo',
@@ -113,6 +138,15 @@ export function loadLocalAppData(
 
   const persisted = parsePersistedLocalAppData(raw);
   if (!persisted) {
+    if (demoDisabled) {
+      return {
+        data: createEmptyLocalAppData(),
+        source: 'empty',
+        savedAt: null,
+        canPersist: true,
+      };
+    }
+
     return {
       data: createDemoLocalAppData(),
       source: 'demo',
@@ -158,6 +192,30 @@ export function clearLocalAppData(storage: StorageLike | null = getBrowserStorag
     storage?.removeItem(LOCAL_STATE_STORAGE_KEY);
   } catch {
     return;
+  }
+}
+
+export function disableDemoSeed(storage: StorageLike | null = getBrowserStorage()) {
+  try {
+    storage?.setItem(DEMO_DISABLED_STORAGE_KEY, 'true');
+  } catch {
+    return;
+  }
+}
+
+export function enableDemoSeed(storage: StorageLike | null = getBrowserStorage()) {
+  try {
+    storage?.removeItem(DEMO_DISABLED_STORAGE_KEY);
+  } catch {
+    return;
+  }
+}
+
+export function isDemoSeedDisabled(storage: StorageLike | null = getBrowserStorage()) {
+  try {
+    return storage?.getItem(DEMO_DISABLED_STORAGE_KEY) === 'true';
+  } catch {
+    return false;
   }
 }
 

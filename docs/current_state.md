@@ -13,8 +13,11 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Local demo budgets, activities, tags, todos, quick-add examples, backup/import messages, pair-code helper copy, sync status copy, and PWA metadata are localized for a natural Chinese mobile app feel.
 - Local app data is persisted in `localStorage` through a small domain layer for activities, scheduled sessions, outcomes, weekly activity bans, target week, and budget filter.
 - First run without saved local data seeds from demo mock data so the phone app is usable immediately.
+- Users can explicitly choose a blank start; that device stores `couple-flow.demo-disabled.v1` so missing local data no longer reseeds demo rows after an intentional empty start.
 - Settings shows local/save/sync status and includes confirmed controls for reset, disconnect, device clear, JSON export, and JSON import.
+- Settings includes a confirmed local `从空白开始` action and a connected `清空双人空间数据` action.
 - When connected to a pair, demo reset and JSON import are disabled so shared Supabase data cannot be accidentally overwritten from Settings.
+- Connected shared clear deletes pair-scoped session outcomes, scheduled sessions, weekly activity bans, and activities in that order while preserving pairs, pair members, and budget groups.
 - Disconnecting a synced device clears only local device data and pair identity; it does not delete or modify remote pair data.
 - Supabase setup files exist with `.env.example`, `supabase/schema.sql`, and `supabase/README.md`.
 - `docs/supabase_setup.md` documents Supabase project setup, required Realtime replication tables, env vars, restart checks, and common troubleshooting.
@@ -31,6 +34,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Week Board keeps past open sessions visible under Needs Review / Overdue until an outcome is recorded.
 - Replacing or redrawing from Needs Review reschedules follow-up work to the current week by default.
 - Activity Pool supports faster mobile entry with simple required fields, optional note/duration/tags, quick-add examples, clear-after-add, and lightweight success feedback.
+- Activity Pool supports editing title, budget group, note, duration, and tags, deleting unreferenced activities, and pausing activities that are already referenced by plans, outcomes, or bans.
 - Draw supports target week, budget filter, two per-member activity bans, eligible count, reveal stack, and accept.
 - Ongoing plans support Done, Not done, Replace, and Redraw outcomes.
 - Critical state rule is represented in UI data flow: draw/accept creates a scheduled session, not history.
@@ -40,6 +44,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 
 - Week Board prioritizes Needs Review, then This Week, then Planning, and exposes outcome actions for reviewable sessions.
 - Activity Pool supports budget tabs, local add form, and active/paused toggles.
+- Activity Pool delete removes unused activities and falls back to pause for referenced activities.
 - Draw Flow filters active eligible activities by budget, activity bans, target-week schedule, and previous-week completed/not-done outcomes.
 - History renders only sessions with outcomes and groups them by week.
 - Settings exposes pair name, timezone, current week, local/sync status, visible connected pair-code details, local-safe reset/disconnect controls, and JSON backup import/export.
@@ -47,7 +52,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Validation
 
 - `npm ci` passed on 2026-06-29.
-- `npm test` passed on 2026-06-29: 8 files, 33 tests.
+- `npm test` passed on 2026-06-29: 8 files, 40 tests.
 - `npm run build` passed on 2026-06-29.
 
 ## Known Gaps

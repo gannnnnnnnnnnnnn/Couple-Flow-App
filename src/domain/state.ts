@@ -4,6 +4,7 @@ import type {
   Rating,
   ScheduledSession,
   SessionOutcome,
+  WeeklyActivityBan,
 } from '../types';
 
 export function getOutcomeBySessionId(outcomes: SessionOutcome[]) {
@@ -70,6 +71,49 @@ export function getFollowUpTargetWeek(
   return session.target_week_start_date < currentWeekStart
     ? currentWeekStart
     : session.target_week_start_date;
+}
+
+export function isActivityReferenced(
+  activityId: string,
+  scheduledSessions: ScheduledSession[],
+  outcomes: SessionOutcome[],
+  weeklyActivityBans: WeeklyActivityBan[],
+) {
+  return (
+    scheduledSessions.some((session) => session.activity_id === activityId) ||
+    outcomes.some((outcome) => outcome.replacement_activity_id === activityId) ||
+    weeklyActivityBans.some((ban) => ban.activity_id === activityId)
+  );
+}
+
+export function deleteOrPauseActivity({
+  activityId,
+  activities,
+  scheduledSessions,
+  outcomes,
+  weeklyActivityBans,
+}: {
+  activityId: string;
+  activities: Activity[];
+  scheduledSessions: ScheduledSession[];
+  outcomes: SessionOutcome[];
+  weeklyActivityBans: WeeklyActivityBan[];
+}) {
+  if (isActivityReferenced(activityId, scheduledSessions, outcomes, weeklyActivityBans)) {
+    return {
+      activities: activities.map((activity) =>
+        activity.id === activityId ? { ...activity, status: 'paused' as const } : activity,
+      ),
+      weeklyActivityBans,
+      result: 'paused' as const,
+    };
+  }
+
+  return {
+    activities: activities.filter((activity) => activity.id !== activityId),
+    weeklyActivityBans: weeklyActivityBans.filter((ban) => ban.activity_id !== activityId),
+    result: 'deleted' as const,
+  };
 }
 
 export function createOutcome(

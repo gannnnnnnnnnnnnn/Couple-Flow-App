@@ -17,7 +17,9 @@ import type {
 import {
   clearLocalAppData,
   clearPairIdentity,
+  createEmptyLocalAppData,
   createDemoLocalAppData,
+  disableDemoSeed,
   loadLocalAppData,
   loadPairIdentity,
   saveLocalAppData,
@@ -52,6 +54,7 @@ export interface AppRepository {
     currentData: LocalAppData,
   ): Promise<RepositorySnapshot>;
   joinPairAndLoad(pairCode: string, displayName: string): Promise<RepositorySnapshot>;
+  startFromScratch(identity: PairIdentity | null): Promise<RepositorySnapshot>;
   clearLocalData(): void;
   subscribeToPair(
     identity: PairIdentity,
@@ -111,6 +114,24 @@ function localSnapshot(mode: RepositoryMode): RepositorySnapshot {
   };
 }
 
+function startLocalFromScratch(mode: RepositoryMode): RepositorySnapshot {
+  const data = createEmptyLocalAppData();
+  disableDemoSeed();
+  const savedAt = saveLocalAppData(data);
+
+  return {
+    data,
+    source: 'saved',
+    savedAt,
+    canPersist: true,
+    pair: demoPair,
+    members: demoMembers,
+    budgetGroups: demoBudgetGroups,
+    identity: loadPairIdentity(),
+    mode,
+  };
+}
+
 export class LocalAppRepository implements AppRepository {
   readonly mode: RepositoryMode = 'local';
   hasRemoteEnv = false;
@@ -151,6 +172,10 @@ export class LocalAppRepository implements AppRepository {
       ...(await this.loadSnapshot()),
       identity,
     };
+  }
+
+  async startFromScratch(_identity: PairIdentity | null = null) {
+    return startLocalFromScratch(this.mode);
   }
 
   clearLocalData() {
@@ -299,6 +324,23 @@ export class SupabaseAppRepository implements AppRepository {
     return this.loadSupabaseSnapshot(identity);
   }
 
+  async startFromScratch(identity: PairIdentity | null) {
+    if (!identity) {
+      return startLocalFromScratch('supabase');
+    }
+
+    const emptyData = createEmptyLocalAppData();
+    disableDemoSeed();
+    saveLocalAppData(emptyData);
+
+    await deletePairScopedRows(this.supabase, 'session_outcomes', identity.pairId);
+    await deletePairScopedRows(this.supabase, 'scheduled_sessions', identity.pairId);
+    await deletePairScopedRows(this.supabase, 'weekly_activity_bans', identity.pairId);
+    await deletePairScopedRows(this.supabase, 'activities', identity.pairId);
+
+    return this.loadSupabaseSnapshot(identity);
+  }
+
   clearLocalData() {
     clearLocalAppData();
     clearPairIdentity();
@@ -435,6 +477,17 @@ async function syncPairScopedTable<T extends { id: string }>(
     if (error) {
       throw error;
     }
+  }
+}
+
+async function deletePairScopedRows(
+  supabase: SupabaseClient,
+  table: string,
+  pairId: string,
+) {
+  const { error } = await supabase.from(table).delete().eq('pair_id', pairId);
+  if (error) {
+    throw error;
   }
 }
 

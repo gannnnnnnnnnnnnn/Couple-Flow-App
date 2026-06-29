@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
 import { createDemoLocalAppData } from '../domain/localPersistence';
 import {
+  LocalAppRepository,
   SupabaseAppRepository,
   createPairCode,
   normalizePairCode,
@@ -57,9 +58,41 @@ class FakeSupabase {
         created_at: '2026-06-29T00:00:00.000Z',
       },
     ],
-    scheduled_sessions: [],
-    weekly_activity_bans: [],
-    session_outcomes: [],
+    scheduled_sessions: [
+      {
+        id: 'session-remote',
+        pair_id: 'pair-remote',
+        activity_id: 'activity-remote-only',
+        draw_session_id: 'draw-1',
+        target_week_start_date: '2026-06-29',
+        status: 'ongoing',
+        todo_text: '',
+        created_at: '2026-06-29T00:00:00.000Z',
+      },
+    ],
+    weekly_activity_bans: [
+      {
+        id: 'ban-remote',
+        draw_session_id: 'draw-1',
+        pair_id: 'pair-remote',
+        member_id: 'member-existing',
+        activity_id: 'activity-remote-only',
+        created_at: '2026-06-29T00:00:00.000Z',
+      },
+    ],
+    session_outcomes: [
+      {
+        id: 'outcome-remote',
+        pair_id: 'pair-remote',
+        scheduled_session_id: 'session-remote',
+        outcome_type: 'completed',
+        rating: 'NPC',
+        reason: null,
+        replacement_activity_id: null,
+        agreed_by_member_ids: ['member-existing'],
+        created_at: '2026-06-29T00:00:00.000Z',
+      },
+    ],
   };
 
   from(table: string) {
@@ -130,9 +163,20 @@ class FakeQuery {
   }
 
   delete() {
-    this.client.operations.push({ table: this.table, type: 'delete' });
+    const client = this.client;
+    const table = this.table;
     return {
-      in: () => Promise.resolve({ data: null, error: null }),
+      eq(column: string, value: unknown) {
+        client.operations.push({ table, type: 'delete' });
+        client.tables[table] = (client.tables[table] ?? []).filter(
+          (row) => row[column] !== value,
+        );
+        return Promise.resolve({ data: null, error: null });
+      },
+      in: () => {
+        client.operations.push({ table, type: 'delete' });
+        return Promise.resolve({ data: null, error: null });
+      },
     };
   }
 
@@ -224,5 +268,52 @@ describe('repository helpers', () => {
     expect(fake.tables.activities).toEqual([
       expect.objectContaining({ id: 'activity-remote-only' }),
     ]);
+  });
+
+  it('local start from scratch returns empty app data', async () => {
+    const repository = new LocalAppRepository();
+
+    const snapshot = await repository.startFromScratch(null);
+
+    expect(snapshot.data.activities).toEqual([]);
+    expect(snapshot.data.scheduledSessions).toEqual([]);
+    expect(snapshot.data.outcomes).toEqual([]);
+    expect(snapshot.data.weeklyActivityBans).toEqual([]);
+    expect(snapshot.data.budgetFilter).toBe('all');
+  });
+
+  it('Supabase start from scratch deletes pair data in safe order and preserves pair metadata', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+
+    const snapshot = await repository.startFromScratch({
+      pairId: 'pair-remote',
+      memberId: 'member-existing',
+      pairCode: 'ABC123',
+      displayName: 'Existing',
+    });
+
+    expect(
+      fake.operations
+        .filter((operation) => operation.type === 'delete')
+        .map((operation) => operation.table),
+    ).toEqual([
+      'session_outcomes',
+      'scheduled_sessions',
+      'weekly_activity_bans',
+      'activities',
+    ]);
+    expect(snapshot.identity?.pairCode).toBe('ABC123');
+    expect(snapshot.pair).toEqual(expect.objectContaining({ id: 'pair-remote' }));
+    expect(snapshot.members).toEqual([
+      expect.objectContaining({ id: 'member-existing' }),
+    ]);
+    expect(snapshot.budgetGroups).toEqual([
+      expect.objectContaining({ id: 'budget-tiny' }),
+    ]);
+    expect(snapshot.data.activities).toEqual([]);
+    expect(snapshot.data.scheduledSessions).toEqual([]);
+    expect(snapshot.data.weeklyActivityBans).toEqual([]);
+    expect(snapshot.data.outcomes).toEqual([]);
   });
 });
