@@ -59,7 +59,7 @@ export function createScheduledSession(
         : targetWeekStartDate === currentWeekStart
           ? 'ongoing'
           : 'planning',
-    todo_text: 'Pick a time together',
+    todo_text: '一起挑个时间',
     created_at: new Date().toISOString(),
   };
 }
