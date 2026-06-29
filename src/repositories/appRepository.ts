@@ -47,8 +47,11 @@ export interface AppRepository {
   hasRemoteEnv: boolean;
   loadSnapshot(): Promise<RepositorySnapshot>;
   saveSnapshot(data: LocalAppData, identity: PairIdentity | null): Promise<SaveResult>;
-  createPair(displayName: string): Promise<PairIdentity>;
-  joinPair(pairCode: string, displayName: string): Promise<PairIdentity>;
+  createPairFromLocal(
+    displayName: string,
+    currentData: LocalAppData,
+  ): Promise<RepositorySnapshot>;
+  joinPairAndLoad(pairCode: string, displayName: string): Promise<RepositorySnapshot>;
   clearLocalData(): void;
   subscribeToPair(
     identity: PairIdentity,
@@ -108,7 +111,7 @@ function localSnapshot(mode: RepositoryMode): RepositorySnapshot {
   };
 }
 
-class LocalAppRepository implements AppRepository {
+export class LocalAppRepository implements AppRepository {
   readonly mode: RepositoryMode = 'local';
   hasRemoteEnv = false;
 
@@ -120,7 +123,7 @@ class LocalAppRepository implements AppRepository {
     return { savedAt: saveLocalAppData(data), mode: this.mode };
   }
 
-  async createPair(displayName: string) {
+  async createPairFromLocal(displayName: string, currentData: LocalAppData) {
     const identity: PairIdentity = {
       pairId: demoPair.id,
       memberId: demoMembers[0]?.id ?? 'member-local',
@@ -128,10 +131,15 @@ class LocalAppRepository implements AppRepository {
       displayName: displayName.trim() || demoMembers[0]?.display_name || 'Me',
     };
     savePairIdentity(identity);
-    return identity;
+    saveLocalAppData(currentData);
+    return {
+      ...(await this.loadSnapshot()),
+      data: currentData,
+      identity,
+    };
   }
 
-  async joinPair(pairCode: string, displayName: string) {
+  async joinPairAndLoad(pairCode: string, displayName: string) {
     const identity: PairIdentity = {
       pairId: demoPair.id,
       memberId: demoMembers[0]?.id ?? 'member-local',
@@ -139,7 +147,10 @@ class LocalAppRepository implements AppRepository {
       displayName: displayName.trim() || demoMembers[0]?.display_name || 'Me',
     };
     savePairIdentity(identity);
-    return identity;
+    return {
+      ...(await this.loadSnapshot()),
+      identity,
+    };
   }
 
   clearLocalData() {
@@ -152,7 +163,7 @@ class LocalAppRepository implements AppRepository {
   }
 }
 
-class SupabaseAppRepository implements AppRepository {
+export class SupabaseAppRepository implements AppRepository {
   readonly mode: RepositoryMode = 'supabase';
   hasRemoteEnv = true;
 
@@ -212,7 +223,7 @@ class SupabaseAppRepository implements AppRepository {
     return { savedAt: saveLocalAppData(scopedData), mode: this.mode };
   }
 
-  async createPair(displayName: string) {
+  async createPairFromLocal(displayName: string, currentData: LocalAppData) {
     const pairId = createId('pair');
     const memberId = createId('member');
     const pairCode = createPairCode();
@@ -244,10 +255,12 @@ class SupabaseAppRepository implements AppRepository {
       displayName: member.display_name,
     };
     savePairIdentity(identity);
-    return identity;
+    const scopedData = scopeDataForPair(currentData, identity, new Set([memberId]));
+    await this.saveSnapshot(scopedData, identity);
+    return this.loadSupabaseSnapshot(identity);
   }
 
-  async joinPair(pairCode: string, displayName: string) {
+  async joinPairAndLoad(pairCode: string, displayName: string) {
     const normalizedCode = normalizePairCode(pairCode);
     const { data: pair, error } = await this.supabase
       .from('pairs')
@@ -283,7 +296,7 @@ class SupabaseAppRepository implements AppRepository {
       displayName: member.display_name,
     };
     savePairIdentity(identity);
-    return identity;
+    return this.loadSupabaseSnapshot(identity);
   }
 
   clearLocalData() {
@@ -416,29 +429,9 @@ async function syncPairScopedTable<T extends { id: string }>(
   pairId: string,
   rows: T[],
 ) {
-  const { data: existing, error: selectError } = await supabase
-    .from(table)
-    .select('id')
-    .eq('pair_id', pairId)
-    .returns<{ id: string }[]>();
-  if (selectError) {
-    throw selectError;
-  }
-
-  const nextIds = new Set(rows.map((row) => row.id));
-  const staleIds = (existing ?? [])
-    .map((row) => row.id)
-    .filter((id) => !nextIds.has(id));
-
-  if (staleIds.length) {
-    const { error } = await supabase.from(table).delete().in('id', staleIds);
-    if (error) {
-      throw error;
-    }
-  }
-
   if (rows.length) {
-    const { error } = await supabase.from(table).upsert(cloneData(rows));
+    const pairRows = cloneData(rows).map((row) => ({ ...row, pair_id: pairId }));
+    const { error } = await supabase.from(table).upsert(pairRows);
     if (error) {
       throw error;
     }

@@ -19,6 +19,7 @@ import {
   loadLocalAppData,
   type LocalStateLoadResult,
   type LocalStateSource,
+  type LocalAppData,
   type PairIdentity,
 } from './domain/localPersistence';
 import {
@@ -83,6 +84,7 @@ function App() {
   const [repositoryMode, setRepositoryMode] = useState<RepositoryMode>(repository.mode);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [hydrating, setHydrating] = useState(true);
 
   const currentWeekStart = useMemo(
     () => getWeekStartDate(new Date(), activePair.timezone),
@@ -127,19 +129,33 @@ function App() {
     setRepositoryMode(snapshot.mode);
   }
 
+  function getCurrentAppData(): LocalAppData {
+    return {
+      activities,
+      scheduledSessions,
+      outcomes,
+      weeklyActivityBans: bans,
+      targetWeekStart,
+      budgetFilter,
+    };
+  }
+
   useEffect(() => {
     let cancelled = false;
+    setHydrating(true);
 
     repository
       .loadSnapshot()
       .then((snapshot) => {
         if (!cancelled) {
           applySnapshot(snapshot);
+          setHydrating(false);
         }
       })
       .catch((error: Error) => {
         if (!cancelled) {
           setSyncError(error.message);
+          setHydrating(false);
         }
       });
 
@@ -149,14 +165,11 @@ function App() {
   }, [repository]);
 
   useEffect(() => {
-    const snapshotData = {
-      activities,
-      scheduledSessions,
-      outcomes,
-      weeklyActivityBans: bans,
-      targetWeekStart,
-      budgetFilter,
-    };
+    if (hydrating) {
+      return;
+    }
+
+    const snapshotData = getCurrentAppData();
 
     repository
       .saveSnapshot(snapshotData, pairIdentity)
@@ -172,6 +185,7 @@ function App() {
     activities,
     bans,
     budgetFilter,
+    hydrating,
     outcomes,
     pairIdentity,
     repository,
@@ -213,28 +227,33 @@ function App() {
 
   async function createPairCode(displayName: string) {
     setSyncing(true);
+    setHydrating(true);
     setSyncError(null);
     try {
-      const identity = await repository.createPair(displayName);
-      setPairIdentity(identity);
-      applySnapshot(await repository.loadSnapshot());
+      const snapshot = await repository.createPairFromLocal(
+        displayName,
+        getCurrentAppData(),
+      );
+      applySnapshot(snapshot);
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : 'Could not create pair code.');
     } finally {
+      setHydrating(false);
       setSyncing(false);
     }
   }
 
   async function joinPairCode(pairCode: string, displayName: string) {
     setSyncing(true);
+    setHydrating(true);
     setSyncError(null);
     try {
-      const identity = await repository.joinPair(pairCode, displayName);
-      setPairIdentity(identity);
-      applySnapshot(await repository.loadSnapshot());
+      const snapshot = await repository.joinPairAndLoad(pairCode, displayName);
+      applySnapshot(snapshot);
     } catch (error) {
       setSyncError(error instanceof Error ? error.message : 'Could not join pair code.');
     } finally {
+      setHydrating(false);
       setSyncing(false);
     }
   }

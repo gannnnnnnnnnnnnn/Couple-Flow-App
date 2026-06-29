@@ -16,6 +16,8 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Supabase setup files exist with `.env.example`, `supabase/schema.sql`, and `supabase/README.md`.
 - When Supabase env vars are present, Settings can create or join a V0 pair code with a local display name and stores the current pair/member identity locally.
 - App data writes through a repository layer with localStorage fallback and Supabase CRUD/realtime support for activities, scheduled sessions, session outcomes, and weekly activity bans.
+- Pair-code join/create hydrates a complete repository snapshot before App autosave resumes, so joining a pair does not overwrite remote data with stale local demo data.
+- Normal Supabase autosave is upsert-only for V0 and intentionally does not delete remote-only rows.
 - Week Board keeps past open sessions visible under Needs Review / Overdue until an outcome is recorded.
 - Replacing or redrawing from Needs Review reschedules follow-up work to the current week by default.
 - Draw supports target week, budget filter, two per-member activity bans, eligible count, reveal stack, and accept.
@@ -34,12 +36,13 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Validation
 
 - `npm ci` passed on 2026-06-29.
-- `npm test` passed on 2026-06-29: 5 files, 17 tests.
+- `npm test` passed on 2026-06-29: 5 files, 20 tests.
 - `npm run build` passed on 2026-06-29.
 
 ## Known Gaps
 
 - Supabase is optional and only enabled by local env vars.
 - Pair-code sync is not production-grade auth; no email auth or real invite security exists yet.
+- Remote deletes are intentionally deferred until an explicit user action and stricter server rules exist.
 - Agreement enforcement is represented in UI state and outcome data, not backed by server rules.
 - Offline caching is app-shell-only and has not been tuned for runtime data.

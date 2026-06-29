@@ -19,6 +19,12 @@ This is the first shared-sync layer for Couple Flow. It is not production-grade 
 
 When those env vars are missing, the app stays in local demo mode and uses `localStorage`.
 
+## Sync Behavior
+
+- Joining a pair loads the remote snapshot first; local demo data does not overwrite the shared pair.
+- Creating a pair intentionally migrates the current local app data into the new pair once.
+- Normal V0 autosave is conservative and upsert-only. Remote deletes are deferred until an explicit user action and stricter authorization rules exist.
+
 ## Pair Code V0
 
 Pair codes are simple shared codes stored on the `pairs` table. A user can create a pair code or join an existing code with a local display name. The app stores the resulting pair/member identity in browser storage.
