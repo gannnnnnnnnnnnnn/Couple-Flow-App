@@ -7,6 +7,7 @@ import { SettingsScreen } from './components/SettingsScreen';
 import { WeekBoard } from './components/WeekBoard';
 import type { Screen } from './components/common';
 import { parseAppBackupJson, stringifyAppBackup } from './domain/backup';
+import type { ImportDataResult } from './domain/settingsSafety';
 import {
   classifySessions,
   createOutcome,
@@ -293,26 +294,29 @@ function App() {
     URL.revokeObjectURL(url);
   }
 
-  async function importAppData(file: File) {
+  async function importAppData(file: File): Promise<ImportDataResult> {
     if (pairIdentity) {
-      return 'Import is disabled while connected to a pair.';
+      return {
+        status: 'error',
+        message: 'Import is disabled while connected to a pair.',
+      };
     }
 
     const raw = await file.text();
     const result = parseAppBackupJson(raw);
     if (!result.ok) {
-      return result.error;
+      return { status: 'error', message: result.error };
     }
 
     const confirmed = window.confirm(
       'Import this backup on this device? It will replace local activities, plans, outcomes, bans, target week, and budget filter. Remote pair data will not be affected.',
     );
     if (!confirmed) {
-      return null;
+      return { status: 'cancelled' };
     }
 
     replaceLocalState(result.backup.data);
-    return null;
+    return { status: 'success' };
   }
 
   function changeTargetWeek(weekStart: string) {

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getSettingsSafetyCopy } from './settingsSafety';
+import { getImportResultMessage, getSettingsSafetyCopy } from './settingsSafety';
 
 describe('settings safety copy', () => {
   it('shows local-only device safety copy without Supabase env', () => {
@@ -35,5 +35,15 @@ describe('settings safety copy', () => {
       resetDemoMessage: 'Demo reset is disabled while connected to a pair.',
       syncStatusLabel: 'Connected to pair code ABC123',
     });
+  });
+
+  it('maps import results without treating cancellation as success', () => {
+    expect(getImportResultMessage({ status: 'success' })).toBe(
+      'Backup imported on this device.',
+    );
+    expect(getImportResultMessage({ status: 'cancelled' })).toBeNull();
+    expect(
+      getImportResultMessage({ status: 'error', message: 'Backup file is not valid JSON.' }),
+    ).toBe('Backup file is not valid JSON.');
   });
 });

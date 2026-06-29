@@ -14,7 +14,11 @@ import {
 import type { LucideIcon } from 'lucide-react';
 import { useRef, useState } from 'react';
 import type { LocalStateSource, PairIdentity } from '../domain/localPersistence';
-import { getSettingsSafetyCopy } from '../domain/settingsSafety';
+import {
+  getImportResultMessage,
+  getSettingsSafetyCopy,
+  type ImportDataResult,
+} from '../domain/settingsSafety';
 import type { Pair } from '../types';
 import type { RepositoryMode } from '../repositories/appRepository';
 
@@ -53,7 +57,7 @@ export function SettingsScreen({
   onCreatePair: (displayName: string) => Promise<void>;
   onClearLocalData: () => void;
   onExportData: () => void;
-  onImportData: (file: File) => Promise<string | null>;
+  onImportData: (file: File) => Promise<ImportDataResult>;
   onJoinPair: (pairCode: string, displayName: string) => Promise<void>;
   onResetDemoData: () => void;
 }) {
@@ -85,8 +89,8 @@ export function SettingsScreen({
       return;
     }
 
-    const error = await onImportData(file);
-    setImportMessage(error ?? 'Backup imported on this device.');
+    const result = await onImportData(file);
+    setImportMessage(getImportResultMessage(result));
     if (importInputRef.current) {
       importInputRef.current.value = '';
     }

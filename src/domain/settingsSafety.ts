@@ -13,6 +13,11 @@ export interface SettingsSafetyCopy {
   syncStatusLabel: string;
 }
 
+export type ImportDataResult =
+  | { status: 'success' }
+  | { status: 'cancelled' }
+  | { status: 'error'; message: string };
+
 export function getSettingsSafetyCopy({
   hasRemoteEnv,
   identity,
@@ -38,4 +43,16 @@ export function getSettingsSafetyCopy({
       ? 'Sync available, not connected'
       : 'Saved on this device',
   };
+}
+
+export function getImportResultMessage(result: ImportDataResult) {
+  if (result.status === 'success') {
+    return 'Backup imported on this device.';
+  }
+
+  if (result.status === 'error') {
+    return result.message;
+  }
+
+  return null;
 }
