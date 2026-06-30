@@ -198,4 +198,31 @@ describe('paired draw helpers', () => {
       })[0].status,
     ).toBe('revealed');
   });
+
+  it('updates an existing same-week draw session with a different id', () => {
+    const existing: DrawSession = {
+      id: 'draw-seed',
+      pair_id: 'pair-1',
+      target_week_start_date: '2026-07-06',
+      created_by_member_id: 'member-partner',
+      status: 'idle',
+      created_at: '2026-06-29T00:00:00.000Z',
+    };
+
+    const updated = upsertDrawSessionState({
+      drawSessions: [existing],
+      pairId: 'pair-1',
+      drawSessionId: getDrawSessionId('pair-1', '2026-07-06'),
+      targetWeekStart: '2026-07-06',
+      actingMemberId: 'member-me',
+      status: 'drawing',
+    });
+
+    expect(updated).toEqual([
+      {
+        ...existing,
+        status: 'drawing',
+      },
+    ]);
+  });
 });

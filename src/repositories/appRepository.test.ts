@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import type { SupabaseClient } from '@supabase/supabase-js';
+import {
+  getLocalAppDataFingerprint,
+  shouldSkipAutosaveForSnapshot,
+} from '../domain/autosave';
 import { createDemoLocalAppData } from '../domain/localPersistence';
 import {
   LocalAppRepository,
@@ -301,11 +305,21 @@ describe('repository helpers', () => {
     ]);
   });
 
-  it('deletes removed own weekly bans with pair, draw, member, and activity scope', async () => {
+  it('deletes removed own weekly bans even if realtime matched before debounce', async () => {
     const fake = new FakeSupabase();
     const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
     const localData = createDemoLocalAppData();
     localData.weeklyActivityBans = [];
+    const currentFingerprint = getLocalAppDataFingerprint(localData);
+
+    expect(
+      shouldSkipAutosaveForSnapshot({
+        currentFingerprint,
+        hasPendingRemoteDeletes: true,
+        lastSavedFingerprint: currentFingerprint,
+        remoteFingerprint: currentFingerprint,
+      }),
+    ).toBe(false);
 
     await repository.saveSnapshot(
       localData,

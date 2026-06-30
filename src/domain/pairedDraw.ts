@@ -136,9 +136,14 @@ export function upsertDrawSessionState({
   status: DrawSession['status'];
   now?: Date;
 }) {
-  const existing = drawSessions.find((drawSession) => drawSession.id === drawSessionId);
+  const existing = drawSessions.find(
+    (drawSession) =>
+      drawSession.id === drawSessionId ||
+      (drawSession.pair_id === pairId &&
+        drawSession.target_week_start_date === targetWeekStart),
+  );
   const nextSession: DrawSession = {
-    id: drawSessionId,
+    id: existing?.id ?? drawSessionId,
     pair_id: pairId,
     target_week_start_date: targetWeekStart,
     created_by_member_id: existing?.created_by_member_id ?? actingMemberId,
@@ -148,7 +153,7 @@ export function upsertDrawSessionState({
 
   if (existing) {
     return drawSessions.map((drawSession) =>
-      drawSession.id === drawSessionId ? nextSession : drawSession,
+      drawSession.id === existing.id ? nextSession : drawSession,
     );
   }
 

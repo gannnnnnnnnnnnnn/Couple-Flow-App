@@ -38,6 +38,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - In paired mode, the acting member is locked to the stored device identity; local/demo mode keeps flexible member testing.
 - Draw supports target week, budget filter, split 我的屏蔽 / 对方的屏蔽 sections, two per-member activity bans, eligible count, reveal stack, and accept.
 - Draw realtime applies shared changes quietly without changing the current screen, week, budget tab, reveal stack, or local form/draft state; if partner choice changes make a visible draw result stale, the draw screen shows `对方刚刚更新了选择，本轮抽签结果可能需要重新抽。`
+- An empty remote pair snapshot from shared clear is authoritative, so other connected devices do not preserve or re-upload stale local activities, draw sessions, plans, outcomes, or bans.
 - Draw sessions use a pragmatic per-target-week guard with `idle`, `drawing`, `revealed`, and `accepted` so a paired device treats a partner's active draw as read-only instead of starting a competing draw.
 - Ongoing plans support Done, Not done, Replace, and Redraw outcomes.
 - Critical state rule is represented in UI data flow: draw/accept creates a scheduled session, not history.
@@ -56,7 +57,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Validation
 
 - `npm ci` passed on 2026-06-30.
-- `npm test` passed on 2026-06-30: 9 files, 54 tests.
+- `npm test` passed on 2026-06-30: 10 files, 59 tests.
 - `npm run build` passed on 2026-06-30.
 
 ## Known Gaps

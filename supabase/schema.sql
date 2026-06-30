@@ -46,7 +46,30 @@ create table if not exists draw_sessions (
   created_at timestamptz not null default now()
 );
 
+-- V0 migration-safe block:
+-- Older PRs used draft/cancelled draw states and did not enforce one draw row
+-- per pair/week. Normalize statuses and remove duplicate historical rows before
+-- adding the stricter state check and unique pair/week index.
 alter table draw_sessions drop constraint if exists draw_sessions_status_check;
+
+update draw_sessions
+set status = 'idle'
+where status in ('draft', 'cancelled');
+
+with ranked_draw_sessions as (
+  select
+    ctid,
+    row_number() over (
+      partition by pair_id, target_week_start_date
+      order by created_at desc, id desc
+    ) as row_rank
+  from draw_sessions
+)
+delete from draw_sessions
+using ranked_draw_sessions
+where draw_sessions.ctid = ranked_draw_sessions.ctid
+  and ranked_draw_sessions.row_rank > 1;
+
 alter table draw_sessions add constraint draw_sessions_status_check
   check (status in ('idle', 'drawing', 'revealed', 'accepted'));
 

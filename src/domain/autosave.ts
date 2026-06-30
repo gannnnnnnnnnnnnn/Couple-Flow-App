@@ -9,13 +9,19 @@ export function getLocalAppDataFingerprint(data: LocalAppData) {
 
 export function shouldSkipAutosaveForSnapshot({
   currentFingerprint,
+  hasPendingRemoteDeletes = false,
   lastSavedFingerprint,
   remoteFingerprint,
 }: {
   currentFingerprint: string;
+  hasPendingRemoteDeletes?: boolean;
   lastSavedFingerprint: string | null;
   remoteFingerprint: string | null;
 }) {
+  if (hasPendingRemoteDeletes) {
+    return false;
+  }
+
   return (
     currentFingerprint === remoteFingerprint ||
     currentFingerprint === lastSavedFingerprint

@@ -38,11 +38,14 @@ import {
   getDrawSessionForWeek,
   getDrawSessionId,
   isPartnerDrawActive,
-  mergeRemoteBansForPairedDevice,
   shouldShowDrawStaleNotice,
   toggleWeeklyActivityBan,
   upsertDrawSessionState,
 } from './domain/pairedDraw';
+import {
+  isAuthoritativeSharedClear,
+  mergeRealtimeSnapshotData,
+} from './domain/realtimeSnapshot';
 import {
   createAppRepository,
   type RemoteDeleteHints,
@@ -192,51 +195,27 @@ function App() {
     const pendingActivityDeleteIds = new Set(
       pendingRemoteDeletesRef.current.activityIds,
     );
-    const nextActivities =
-      preserveDeviceUi && snapshot.identity
-        ? mergeActivitiesForRealtime(
-            latestUiRef.current.activities,
-            snapshot.data.activities,
-            snapshot.identity.memberId,
-            pendingActivityDeleteIds,
-          )
-        : snapshot.data.activities;
-    const nextDrawSessions =
-      preserveDeviceUi && snapshot.identity
-        ? mergeDrawSessionsForRealtime(
-            latestUiRef.current.drawSessions,
-            snapshot.data.drawSessions,
-            snapshot.identity.memberId,
-          )
-        : snapshot.data.drawSessions;
-    const nextScheduledSessions = preserveDeviceUi
-      ? mergeLocalRowsById(
-          latestUiRef.current.scheduledSessions,
-          snapshot.data.scheduledSessions,
-        )
-      : snapshot.data.scheduledSessions;
-    const nextOutcomes = preserveDeviceUi
-      ? mergeLocalRowsById(latestUiRef.current.outcomes, snapshot.data.outcomes)
-      : snapshot.data.outcomes;
-    const nextBans =
-      preserveDeviceUi && snapshot.identity
-        ? mergeRemoteBansForPairedDevice(
-            latestUiRef.current.bans,
-            snapshot.data.weeklyActivityBans,
-            snapshot.identity.memberId,
-          )
-        : snapshot.data.weeklyActivityBans;
-    const appliedData: LocalAppData = {
-      activities: nextActivities,
-      drawSessions: nextDrawSessions,
-      scheduledSessions: nextScheduledSessions,
-      outcomes: nextOutcomes,
-      weeklyActivityBans: nextBans,
+    const currentLocalData: LocalAppData = {
+      activities: latestUiRef.current.activities,
+      drawSessions: latestUiRef.current.drawSessions,
+      scheduledSessions: latestUiRef.current.scheduledSessions,
+      outcomes: latestUiRef.current.outcomes,
+      weeklyActivityBans: latestUiRef.current.bans,
       targetWeekStart: preserveDeviceUi
         ? latestUiRef.current.targetWeekStart
-        : snapshot.data.targetWeekStart,
+        : targetWeekStart,
       budgetFilter: preserveDeviceUi ? latestUiRef.current.budgetFilter : snapshot.data.budgetFilter,
     };
+    const authoritativeSharedClear =
+      preserveDeviceUi && isAuthoritativeSharedClear(snapshot.data);
+    const appliedData = mergeRealtimeSnapshotData({
+      actingMemberId: snapshot.identity?.memberId ?? null,
+      localData: currentLocalData,
+      pendingActivityDeleteIds,
+      preserveDeviceUi,
+      remoteData: snapshot.data,
+    });
+
     if (suppressAutosave) {
       const fingerprint = getLocalAppDataFingerprint(appliedData);
       remoteSnapshotFingerprintRef.current = fingerprint;
@@ -244,6 +223,7 @@ function App() {
     }
     if (
       preserveDeviceUi &&
+      !authoritativeSharedClear &&
       shouldShowDrawStaleNotice({
         localBans: latestUiRef.current.bans,
         remoteBans: snapshot.data.weeklyActivityBans,
@@ -257,14 +237,17 @@ function App() {
       setDrawNotice('对方刚刚更新了选择，本轮抽签结果可能需要重新抽。');
     }
 
-    setActivities(nextActivities);
-    setDrawSessions(nextDrawSessions);
-    setScheduledSessions(nextScheduledSessions);
-    setOutcomes(nextOutcomes);
-    setBans(nextBans);
+    setActivities(appliedData.activities);
+    setDrawSessions(appliedData.drawSessions);
+    setScheduledSessions(appliedData.scheduledSessions);
+    setOutcomes(appliedData.outcomes);
+    setBans(appliedData.weeklyActivityBans);
     if (!preserveDeviceUi) {
       setTargetWeekStart(snapshot.data.targetWeekStart);
       setBudgetFilter(snapshot.data.budgetFilter);
+      setDrawResults([]);
+      setDrawNotice(null);
+    } else if (authoritativeSharedClear) {
       setDrawResults([]);
       setDrawNotice(null);
     }
@@ -316,6 +299,13 @@ function App() {
       );
   }
 
+  function hasPendingRemoteDeleteHints() {
+    return (
+      pendingRemoteDeletesRef.current.activityIds.length > 0 ||
+      pendingRemoteDeletesRef.current.weeklyActivityBans.length > 0
+    );
+  }
+
   useEffect(() => {
     let cancelled = false;
     setHydrating(true);
@@ -351,6 +341,7 @@ function App() {
     if (
       shouldSkipAutosaveForSnapshot({
         currentFingerprint,
+        hasPendingRemoteDeletes: hasPendingRemoteDeleteHints(),
         lastSavedFingerprint: lastSavedFingerprintRef.current,
         remoteFingerprint: remoteSnapshotFingerprintRef.current,
       })
@@ -869,58 +860,6 @@ function App() {
       )}
     </AppShell>
   );
-}
-
-function mergeActivitiesForRealtime(
-  localActivities: Activity[],
-  remoteActivities: Activity[],
-  actingMemberId: string,
-  pendingDeleteIds: Set<string>,
-) {
-  const merged = new Map(
-    remoteActivities
-      .filter((activity) => !pendingDeleteIds.has(activity.id))
-      .map((activity) => [activity.id, activity]),
-  );
-
-  localActivities.forEach((activity) => {
-    if (pendingDeleteIds.has(activity.id) || activity.created_by_member_id !== actingMemberId) {
-      return;
-    }
-    merged.set(activity.id, activity);
-  });
-
-  return [...merged.values()];
-}
-
-function mergeDrawSessionsForRealtime(
-  localDrawSessions: DrawSession[],
-  remoteDrawSessions: DrawSession[],
-  actingMemberId: string,
-) {
-  const merged = new Map(remoteDrawSessions.map((drawSession) => [drawSession.id, drawSession]));
-
-  localDrawSessions.forEach((drawSession) => {
-    const remoteDrawSession = merged.get(drawSession.id);
-    if (
-      drawSession.created_by_member_id === actingMemberId &&
-      (!remoteDrawSession || remoteDrawSession.created_by_member_id === actingMemberId)
-    ) {
-      merged.set(drawSession.id, drawSession);
-    }
-  });
-
-  return [...merged.values()];
-}
-
-function mergeLocalRowsById<T extends { id: string }>(localRows: T[], remoteRows: T[]) {
-  const merged = new Map(remoteRows.map((row) => [row.id, row]));
-  localRows.forEach((row) => {
-    if (!merged.has(row.id)) {
-      merged.set(row.id, row);
-    }
-  });
-  return [...merged.values()];
 }
 
 export default App;
