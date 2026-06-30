@@ -6,6 +6,7 @@ import type {
   Activity,
   BudgetFilter,
   BudgetGroup,
+  DrawSession,
   PairMember,
   ScheduledSession,
   SessionOutcome,
@@ -24,11 +25,18 @@ export function DrawScreen({
   outcomes,
   bans,
   targetWeekStart,
+  drawSessionId,
   budgetFilter,
   drawResults,
+  currentMemberId,
+  currentDrawSession,
+  drawNotice,
+  pairedMode,
+  partnerDrawActive,
   onTargetWeekChange,
   onBudgetChange,
   onToggleBan,
+  onStartDraw,
   onDraw,
   onAccept,
 }: {
@@ -42,16 +50,22 @@ export function DrawScreen({
   outcomes: SessionOutcome[];
   bans: WeeklyActivityBan[];
   targetWeekStart: string;
+  drawSessionId: string;
   budgetFilter: BudgetFilter;
   drawResults: Activity[];
+  currentMemberId: string;
+  currentDrawSession: DrawSession | undefined;
+  drawNotice: string | null;
+  pairedMode: boolean;
+  partnerDrawActive: boolean;
   onTargetWeekChange: (weekStart: string) => void;
   onBudgetChange: (budget: BudgetFilter) => void;
   onToggleBan: (memberId: string, activityId: string) => void;
+  onStartDraw: () => boolean;
   onDraw: (results: Activity[]) => void;
   onAccept: (activity: Activity) => void;
 }) {
   const [revealing, setRevealing] = useState(false);
-  const drawSessionId = `draw-${targetWeekStart}`;
   const bannableActivities = activities.filter(
     (activity) =>
       activity.status === 'active' &&
@@ -68,6 +82,10 @@ export function DrawScreen({
   });
 
   function runDraw() {
+    if (!onStartDraw()) {
+      return;
+    }
+
     setRevealing(true);
     const results = drawActivities(eligibleActivities, 3, Date.now());
     window.setTimeout(() => {
@@ -82,6 +100,17 @@ export function DrawScreen({
         <h2 className="text-2xl font-black text-ink">抽签</h2>
         <p className="mt-1 text-sm text-ink/60">选好周次和预算，每个人最多先划掉两个不想要的。</p>
       </div>
+
+      {pairedMode && (
+        <p className="rounded-md bg-mint/25 px-3 py-2 text-sm font-bold text-ink/70">
+          配对模式：这台设备只能编辑我的选择，对方的选择只读同步。
+        </p>
+      )}
+      {drawNotice && (
+        <p className="rounded-md bg-butter/40 px-3 py-2 text-sm font-bold text-ink/70">
+          {drawNotice}
+        </p>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <button
@@ -120,19 +149,41 @@ export function DrawScreen({
       </div>
 
       <div className="space-y-3">
-        {members.map((member) => (
-          <BanPanel
-            key={member.id}
-            activities={bannableActivities}
-            bans={bans}
-            budgetLabel={
-              budgetFilter === 'all' ? '全部预算' : budgetById.get(budgetFilter)?.name ?? '预算'
-            }
-            drawSessionId={drawSessionId}
-            member={member}
-            onToggleBan={onToggleBan}
-          />
-        ))}
+        {members
+          .filter((member) => !pairedMode || member.id === currentMemberId)
+          .map((member) => (
+            <BanPanel
+              key={member.id}
+              activities={bannableActivities}
+              bans={bans}
+              budgetLabel={
+                budgetFilter === 'all' ? '全部预算' : budgetById.get(budgetFilter)?.name ?? '预算'
+              }
+              drawSessionId={drawSessionId}
+              editable
+              member={member}
+              title={pairedMode ? '我的屏蔽' : `${member.display_name} 这轮不想抽到`}
+              onToggleBan={onToggleBan}
+            />
+          ))}
+        {pairedMode &&
+          members
+            .filter((member) => member.id !== currentMemberId)
+            .map((member) => (
+              <BanPanel
+                key={member.id}
+                activities={bannableActivities}
+                bans={bans}
+                budgetLabel={
+                  budgetFilter === 'all' ? '全部预算' : budgetById.get(budgetFilter)?.name ?? '预算'
+                }
+                drawSessionId={drawSessionId}
+                editable={false}
+                member={member}
+                title="对方的屏蔽"
+                onToggleBan={onToggleBan}
+              />
+            ))}
       </div>
 
       <div className="rounded-md bg-white/80 p-4 shadow-sm">
@@ -143,10 +194,25 @@ export function DrawScreen({
           </div>
           <Chip tone={eligibleActivities.length ? 'mint' : 'butter'}>{eligibleActivities.length}</Chip>
         </div>
+        {partnerDrawActive && (
+          <p className="mt-3 rounded-md bg-cream px-3 py-2 text-sm font-bold text-ink/60">
+            对方正在处理这周抽签，这台设备先只读查看。
+          </p>
+        )}
+        {currentDrawSession?.status === 'accepted' && (
+          <p className="mt-3 rounded-md bg-cream px-3 py-2 text-sm font-bold text-ink/60">
+            这周已经收下一个计划了。
+          </p>
+        )}
         <button
           className="mt-4 h-12 w-full rounded-md bg-coral px-4 font-black text-cream shadow-soft disabled:opacity-40"
           type="button"
-          disabled={!eligibleActivities.length || revealing}
+          disabled={
+            !eligibleActivities.length ||
+            revealing ||
+            partnerDrawActive ||
+            currentDrawSession?.status === 'accepted'
+          }
           onClick={runDraw}
         >
           {revealing ? '揭晓中...' : '抽 1-3 个计划'}
@@ -186,8 +252,9 @@ export function DrawScreen({
               <h3 className="text-2xl font-black leading-tight">{activity.title}</h3>
               <p className="mt-2 text-sm text-cream/75">{activity.note}</p>
               <button
-                className="mt-5 h-11 w-full rounded-md bg-cream px-4 font-bold text-ink"
+                className="mt-5 h-11 w-full rounded-md bg-cream px-4 font-bold text-ink disabled:opacity-45"
                 type="button"
+                disabled={partnerDrawActive}
                 onClick={() => onAccept(activity)}
               >
                 就它了
@@ -205,14 +272,18 @@ function BanPanel({
   bans,
   budgetLabel,
   drawSessionId,
+  editable,
   member,
+  title,
   onToggleBan,
 }: {
   activities: Activity[];
   bans: WeeklyActivityBan[];
   budgetLabel: string;
   drawSessionId: string;
+  editable: boolean;
   member: PairMember;
+  title: string;
   onToggleBan: (memberId: string, activityId: string) => void;
 }) {
   const memberBans = bans.filter(
@@ -223,7 +294,7 @@ function BanPanel({
     <div className="rounded-md bg-white/80 p-4 shadow-sm">
       <div className="mb-3 flex items-center justify-between">
         <div>
-          <p className="font-black text-ink">{member.display_name} 这轮不想抽到</p>
+          <p className="font-black text-ink">{title}</p>
           <p className="text-xs font-semibold text-ink/50">{budgetLabel}</p>
         </div>
         <Chip tone={memberBans.length === 2 ? 'coral' : 'butter'}>{memberBans.length}/2</Chip>
@@ -236,7 +307,7 @@ function BanPanel({
         )}
         {activities.map((activity) => {
           const isBanned = memberBans.some((ban) => ban.activity_id === activity.id);
-          const disabled = !isBanned && memberBans.length >= 2;
+          const disabled = !editable || (!isBanned && memberBans.length >= 2);
           return (
             <button
               key={activity.id}
@@ -252,7 +323,7 @@ function BanPanel({
               onClick={() => onToggleBan(member.id, activity.id)}
             >
               <span>{activity.title}</span>
-              {isBanned && <span>已划掉</span>}
+              {isBanned && <span>{editable ? '已屏蔽' : '对方已屏蔽'}</span>}
             </button>
           );
         })}

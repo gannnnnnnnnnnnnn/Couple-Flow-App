@@ -34,7 +34,21 @@ import {
   type PairIdentity,
 } from './domain/localPersistence';
 import {
+  getActingMemberId,
+  getDrawSessionForWeek,
+  getDrawSessionId,
+  isPartnerDrawActive,
+  shouldShowDrawStaleNotice,
+  toggleWeeklyActivityBan,
+  upsertDrawSessionState,
+} from './domain/pairedDraw';
+import {
+  isAuthoritativeSharedClear,
+  mergeRealtimeSnapshotData,
+} from './domain/realtimeSnapshot';
+import {
   createAppRepository,
+  type RemoteDeleteHints,
   type RepositoryMode,
   type RepositorySnapshot,
 } from './repositories/appRepository';
@@ -47,6 +61,7 @@ import type {
   Activity,
   BudgetFilter,
   BudgetGroup,
+  DrawSession,
   Pair,
   PairMember,
   Rating,
@@ -68,6 +83,9 @@ function App() {
   const [activeBudgetGroups, setActiveBudgetGroups] = useState<BudgetGroup[]>(budgetGroups);
   const [activities, setActivities] = useState<Activity[]>(
     initialLocalState.data.activities,
+  );
+  const [drawSessions, setDrawSessions] = useState<DrawSession[]>(
+    initialLocalState.data.drawSessions,
   );
   const [scheduledSessions, setScheduledSessions] = useState<ScheduledSession[]>(
     initialLocalState.data.scheduledSessions,
@@ -99,6 +117,21 @@ function App() {
   const lastSavedFingerprintRef = useRef<string | null>(null);
   const remoteSnapshotFingerprintRef = useRef<string | null>(null);
   const saveSequenceRef = useRef(0);
+  const pendingRemoteDeletesRef = useRef<Required<RemoteDeleteHints>>({
+    activityIds: [],
+    weeklyActivityBans: [],
+  });
+  const latestUiRef = useRef({
+    targetWeekStart: '',
+    budgetFilter: 'all' as BudgetFilter,
+    drawResults: [] as Activity[],
+    activities: [] as Activity[],
+    drawSessions: [] as DrawSession[],
+    scheduledSessions: [] as ScheduledSession[],
+    outcomes: [] as SessionOutcome[],
+    bans: [] as WeeklyActivityBan[],
+  });
+  const [drawNotice, setDrawNotice] = useState<string | null>(null);
 
   const currentWeekStart = useMemo(
     () => getWeekStartDate(new Date(), activePair.timezone),
@@ -136,21 +169,88 @@ function App() {
   );
 
   const activePairId = pairIdentity?.pairId ?? activePair.id;
-  const activeMemberId = pairIdentity?.memberId ?? activeMembers[0]?.id ?? 'member-local';
+  const activeMemberId = getActingMemberId(pairIdentity, activeMembers);
+  const currentDrawSessionId = getDrawSessionId(activePairId, selectedTargetWeek);
+  const currentDrawSession = getDrawSessionForWeek(drawSessions, selectedTargetWeek);
+  const partnerDrawActive = pairIdentity
+    ? isPartnerDrawActive(currentDrawSession, activeMemberId)
+    : false;
 
-  function applySnapshot(snapshot: RepositorySnapshot, suppressAutosave = true) {
-    const fingerprint = getLocalAppDataFingerprint(snapshot.data);
+  latestUiRef.current = {
+    targetWeekStart: selectedTargetWeek,
+    budgetFilter,
+    drawResults,
+    activities,
+    drawSessions,
+    scheduledSessions,
+    outcomes,
+    bans,
+  };
+
+  function applySnapshot(
+    snapshot: RepositorySnapshot,
+    options: { suppressAutosave?: boolean; preserveDeviceUi?: boolean } = {},
+  ) {
+    const { suppressAutosave = true, preserveDeviceUi = false } = options;
+    const pendingActivityDeleteIds = new Set(
+      pendingRemoteDeletesRef.current.activityIds,
+    );
+    const currentLocalData: LocalAppData = {
+      activities: latestUiRef.current.activities,
+      drawSessions: latestUiRef.current.drawSessions,
+      scheduledSessions: latestUiRef.current.scheduledSessions,
+      outcomes: latestUiRef.current.outcomes,
+      weeklyActivityBans: latestUiRef.current.bans,
+      targetWeekStart: preserveDeviceUi
+        ? latestUiRef.current.targetWeekStart
+        : targetWeekStart,
+      budgetFilter: preserveDeviceUi ? latestUiRef.current.budgetFilter : snapshot.data.budgetFilter,
+    };
+    const authoritativeSharedClear =
+      preserveDeviceUi && isAuthoritativeSharedClear(snapshot.data);
+    const appliedData = mergeRealtimeSnapshotData({
+      actingMemberId: snapshot.identity?.memberId ?? null,
+      localData: currentLocalData,
+      pendingActivityDeleteIds,
+      preserveDeviceUi,
+      remoteData: snapshot.data,
+    });
+
     if (suppressAutosave) {
+      const fingerprint = getLocalAppDataFingerprint(appliedData);
       remoteSnapshotFingerprintRef.current = fingerprint;
       lastSavedFingerprintRef.current = fingerprint;
     }
+    if (
+      preserveDeviceUi &&
+      !authoritativeSharedClear &&
+      shouldShowDrawStaleNotice({
+        localBans: latestUiRef.current.bans,
+        remoteBans: snapshot.data.weeklyActivityBans,
+        drawSessionId: getDrawSessionId(
+          snapshot.identity?.pairId ?? snapshot.pair.id,
+          latestUiRef.current.targetWeekStart,
+        ),
+        drawResults: latestUiRef.current.drawResults,
+      })
+    ) {
+      setDrawNotice('对方刚刚更新了选择，本轮抽签结果可能需要重新抽。');
+    }
 
-    setActivities(snapshot.data.activities);
-    setScheduledSessions(snapshot.data.scheduledSessions);
-    setOutcomes(snapshot.data.outcomes);
-    setBans(snapshot.data.weeklyActivityBans);
-    setTargetWeekStart(snapshot.data.targetWeekStart);
-    setBudgetFilter(snapshot.data.budgetFilter);
+    setActivities(appliedData.activities);
+    setDrawSessions(appliedData.drawSessions);
+    setScheduledSessions(appliedData.scheduledSessions);
+    setOutcomes(appliedData.outcomes);
+    setBans(appliedData.weeklyActivityBans);
+    if (!preserveDeviceUi) {
+      setTargetWeekStart(snapshot.data.targetWeekStart);
+      setBudgetFilter(snapshot.data.budgetFilter);
+      setDrawResults([]);
+      setDrawNotice(null);
+    } else if (authoritativeSharedClear) {
+      setDrawResults([]);
+      setDrawNotice(null);
+    }
     setStorageSource(snapshot.source);
     setLastSavedAt(snapshot.savedAt);
     setActivePair(snapshot.pair);
@@ -158,18 +258,52 @@ function App() {
     setActiveBudgetGroups(snapshot.budgetGroups);
     setPairIdentity(snapshot.identity);
     setRepositoryMode(snapshot.mode);
-    setDrawResults([]);
   }
 
   function getCurrentAppData(): LocalAppData {
     return {
       activities,
+      drawSessions,
       scheduledSessions,
       outcomes,
       weeklyActivityBans: bans,
       targetWeekStart,
       budgetFilter,
     };
+  }
+
+  function getPendingRemoteDeleteHints(): RemoteDeleteHints {
+    return {
+      activityIds: [...pendingRemoteDeletesRef.current.activityIds],
+      weeklyActivityBans: pendingRemoteDeletesRef.current.weeklyActivityBans.map((ban) => ({
+        ...ban,
+      })),
+    };
+  }
+
+  function clearPendingRemoteDeleteHints(sentHints: RemoteDeleteHints) {
+    const sentActivityIds = new Set(sentHints.activityIds ?? []);
+    const sentBanKeys = new Set(
+      (sentHints.weeklyActivityBans ?? []).map(
+        (ban) => `${ban.drawSessionId}:${ban.memberId}:${ban.activityId}`,
+      ),
+    );
+
+    pendingRemoteDeletesRef.current.activityIds =
+      pendingRemoteDeletesRef.current.activityIds.filter(
+        (activityId) => !sentActivityIds.has(activityId),
+      );
+    pendingRemoteDeletesRef.current.weeklyActivityBans =
+      pendingRemoteDeletesRef.current.weeklyActivityBans.filter(
+        (ban) => !sentBanKeys.has(`${ban.drawSessionId}:${ban.memberId}:${ban.activityId}`),
+      );
+  }
+
+  function hasPendingRemoteDeleteHints() {
+    return (
+      pendingRemoteDeletesRef.current.activityIds.length > 0 ||
+      pendingRemoteDeletesRef.current.weeklyActivityBans.length > 0
+    );
   }
 
   useEffect(() => {
@@ -207,6 +341,7 @@ function App() {
     if (
       shouldSkipAutosaveForSnapshot({
         currentFingerprint,
+        hasPendingRemoteDeletes: hasPendingRemoteDeleteHints(),
         lastSavedFingerprint: lastSavedFingerprintRef.current,
         remoteFingerprint: remoteSnapshotFingerprintRef.current,
       })
@@ -217,6 +352,7 @@ function App() {
 
     const saveId = saveSequenceRef.current + 1;
     saveSequenceRef.current = saveId;
+    const deleteHints = getPendingRemoteDeleteHints();
     let syncingTimer: number | undefined;
 
     const debounceTimer = window.setTimeout(() => {
@@ -227,12 +363,13 @@ function App() {
       }, SYNCING_VISIBILITY_DELAY_MS);
 
       repository
-        .saveSnapshot(snapshotData, pairIdentity)
+        .saveSnapshot(snapshotData, pairIdentity, deleteHints)
         .then(({ savedAt, mode }) => {
           if (saveSequenceRef.current !== saveId) {
             return;
           }
           lastSavedFingerprintRef.current = currentFingerprint;
+          clearPendingRemoteDeleteHints(deleteHints);
           if (savedAt) {
             setLastSavedAt(savedAt);
             setStorageSource('saved');
@@ -265,6 +402,7 @@ function App() {
     activities,
     bans,
     budgetFilter,
+    drawSessions,
     hydrating,
     outcomes,
     pairIdentity,
@@ -278,17 +416,21 @@ function App() {
       return undefined;
     }
 
-    return repository.subscribeToPair(pairIdentity, (snapshot) => applySnapshot(snapshot));
+    return repository.subscribeToPair(pairIdentity, (snapshot) =>
+      applySnapshot(snapshot, { preserveDeviceUi: true }),
+    );
   }, [pairIdentity, repository]);
 
   function replaceLocalState(data = createDemoLocalAppData(), source: LocalStateSource = 'demo') {
     setActivities(data.activities);
+    setDrawSessions(data.drawSessions);
     setScheduledSessions(data.scheduledSessions);
     setOutcomes(data.outcomes);
     setBans(data.weeklyActivityBans);
     setTargetWeekStart(data.targetWeekStart);
     setBudgetFilter(data.budgetFilter);
     setDrawResults([]);
+    setDrawNotice(null);
     setActiveScreen('board');
     setStorageSource(source);
   }
@@ -427,62 +569,92 @@ function App() {
   function changeTargetWeek(weekStart: string) {
     setTargetWeekStart(weekStart);
     setDrawResults([]);
+    setDrawNotice(null);
   }
 
   function changeBudget(filter: BudgetFilter) {
     setBudgetFilter(filter);
     setDrawResults([]);
+    setDrawNotice(null);
   }
 
   function toggleBan(memberId: string, activityId: string) {
-    const drawSessionId = `draw-${selectedTargetWeek}`;
-
     setBans((currentBans) => {
-      const existing = currentBans.find(
-        (ban) =>
-          ban.draw_session_id === drawSessionId &&
-          ban.member_id === memberId &&
-          ban.activity_id === activityId,
-      );
+      const result = toggleWeeklyActivityBan({
+        bans: currentBans,
+        pairId: activePairId,
+        drawSessionId: currentDrawSessionId,
+        requestedMemberId: memberId,
+        actingMemberId: activeMemberId,
+        activityId,
+        pairedMode: !!pairIdentity,
+      });
 
-      if (existing) {
-        return currentBans.filter((ban) => ban.id !== existing.id);
+      if (result.deletedBan) {
+        pendingRemoteDeletesRef.current.weeklyActivityBans.push(result.deletedBan);
       }
 
-      const memberBanCount = currentBans.filter(
-        (ban) => ban.draw_session_id === drawSessionId && ban.member_id === memberId,
-      ).length;
-
-      if (memberBanCount >= 2) {
-        return currentBans;
-      }
-
-      return [
-        ...currentBans,
-        {
-          id: `ban-${drawSessionId}-${memberId}-${activityId}`,
-          pair_id: activePairId,
-          draw_session_id: drawSessionId,
-          member_id: memberId,
-          activity_id: activityId,
-          created_at: new Date().toISOString(),
-        },
-      ];
+      return result.bans;
     });
     setDrawResults([]);
+    setDrawNotice(null);
+  }
+
+  function startDraw() {
+    if (partnerDrawActive) {
+      return false;
+    }
+
+    setDrawSessions((sessions) =>
+      upsertDrawSessionState({
+        drawSessions: sessions,
+        pairId: activePairId,
+        drawSessionId: currentDrawSessionId,
+        targetWeekStart: selectedTargetWeek,
+        actingMemberId: activeMemberId,
+        status: 'drawing',
+      }),
+    );
+    setDrawNotice(null);
+    return true;
+  }
+
+  function revealDraw(results: Activity[]) {
+    setDrawResults(results);
+    setDrawSessions((sessions) =>
+      upsertDrawSessionState({
+        drawSessions: sessions,
+        pairId: activePairId,
+        drawSessionId: currentDrawSessionId,
+        targetWeekStart: selectedTargetWeek,
+        actingMemberId: activeMemberId,
+        status: 'revealed',
+      }),
+    );
   }
 
   function acceptDraw(activity: Activity) {
     const session = createScheduledSession(
       activity,
-      `draw-${selectedTargetWeek}`,
+      currentDrawSessionId,
       activePairId,
       selectedTargetWeek,
       currentWeekStart,
     );
 
     setScheduledSessions((sessions) => [...sessions, session]);
+    setDrawSessions((sessions) =>
+      upsertDrawSessionState({
+        drawSessions: sessions,
+        pairId: activePairId,
+        drawSessionId: currentDrawSessionId,
+        targetWeekStart: selectedTargetWeek,
+        actingMemberId: activeMemberId,
+        status: 'accepted',
+      }),
+    );
     setDrawResults([]);
+    setDrawNotice(null);
     setActiveScreen('board');
   }
 
@@ -580,6 +752,9 @@ function App() {
     });
     setActivities(result.activities);
     setBans(result.weeklyActivityBans);
+    if (result.result === 'deleted') {
+      pendingRemoteDeletesRef.current.activityIds.push(activityId);
+    }
   }
 
   return (
@@ -618,12 +793,19 @@ function App() {
           outcomes={outcomes}
           bans={bans}
           targetWeekStart={selectedTargetWeek}
+          drawSessionId={currentDrawSessionId}
           budgetFilter={budgetFilter}
           drawResults={drawResults}
+          currentMemberId={activeMemberId}
+          currentDrawSession={currentDrawSession}
+          drawNotice={drawNotice}
+          pairedMode={!!pairIdentity}
+          partnerDrawActive={partnerDrawActive}
           onTargetWeekChange={changeTargetWeek}
           onBudgetChange={changeBudget}
           onToggleBan={toggleBan}
-          onDraw={setDrawResults}
+          onStartDraw={startDraw}
+          onDraw={revealDraw}
           onAccept={acceptDraw}
         />
       )}

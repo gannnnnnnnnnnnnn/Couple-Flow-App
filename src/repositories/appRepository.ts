@@ -8,6 +8,7 @@ import {
 import type {
   Activity,
   BudgetGroup,
+  DrawSession,
   Pair,
   PairMember,
   ScheduledSession,
@@ -44,11 +45,24 @@ export interface SaveResult {
   mode: RepositoryMode;
 }
 
+export interface RemoteDeleteHints {
+  activityIds?: string[];
+  weeklyActivityBans?: {
+    drawSessionId: string;
+    memberId: string;
+    activityId: string;
+  }[];
+}
+
 export interface AppRepository {
   mode: RepositoryMode;
   hasRemoteEnv: boolean;
   loadSnapshot(): Promise<RepositorySnapshot>;
-  saveSnapshot(data: LocalAppData, identity: PairIdentity | null): Promise<SaveResult>;
+  saveSnapshot(
+    data: LocalAppData,
+    identity: PairIdentity | null,
+    deleteHints?: RemoteDeleteHints,
+  ): Promise<SaveResult>;
   createPairFromLocal(
     displayName: string,
     currentData: LocalAppData,
@@ -206,6 +220,7 @@ export class SupabaseAppRepository implements AppRepository {
   async saveSnapshot(
     data: LocalAppData,
     identity: PairIdentity | null,
+    deleteHints: RemoteDeleteHints = {},
   ): Promise<SaveResult> {
     if (!identity) {
       return { savedAt: saveLocalAppData(data), mode: 'local' };
@@ -227,6 +242,12 @@ export class SupabaseAppRepository implements AppRepository {
       ),
       syncPairScopedTable(
         this.supabase,
+        'draw_sessions',
+        identity.pairId,
+        scopedData.drawSessions,
+      ),
+      syncPairScopedTable(
+        this.supabase,
         'scheduled_sessions',
         identity.pairId,
         scopedData.scheduledSessions,
@@ -244,6 +265,8 @@ export class SupabaseAppRepository implements AppRepository {
         scopedData.outcomes.map((outcome) => toOutcomeRow(outcome, identity.pairId)),
       ),
     ]);
+
+    await applyRemoteDeleteHints(this.supabase, identity.pairId, deleteHints);
 
     return { savedAt: saveLocalAppData(scopedData), mode: this.mode };
   }
@@ -336,6 +359,7 @@ export class SupabaseAppRepository implements AppRepository {
     await deletePairScopedRows(this.supabase, 'session_outcomes', identity.pairId);
     await deletePairScopedRows(this.supabase, 'scheduled_sessions', identity.pairId);
     await deletePairScopedRows(this.supabase, 'weekly_activity_bans', identity.pairId);
+    await deletePairScopedRows(this.supabase, 'draw_sessions', identity.pairId);
     await deletePairScopedRows(this.supabase, 'activities', identity.pairId);
 
     return this.loadSupabaseSnapshot(identity);
@@ -352,6 +376,7 @@ export class SupabaseAppRepository implements AppRepository {
       this.channelFor(identity, 'scheduled_sessions', onSnapshot),
       this.channelFor(identity, 'session_outcomes', onSnapshot),
       this.channelFor(identity, 'weekly_activity_bans', onSnapshot),
+      this.channelFor(identity, 'draw_sessions', onSnapshot),
       this.channelFor(identity, 'pair_members', onSnapshot),
     ];
 
@@ -385,12 +410,13 @@ export class SupabaseAppRepository implements AppRepository {
   }
 
   private async loadSupabaseSnapshot(identity: PairIdentity): Promise<RepositorySnapshot> {
-    const [pair, members, budgetGroups, activities, scheduledSessions, bans, outcomes] =
+    const [pair, members, budgetGroups, activities, drawSessions, scheduledSessions, bans, outcomes] =
       await Promise.all([
         selectSingle<SupabasePair>(this.supabase, 'pairs', identity.pairId),
         selectPairRows<PairMember>(this.supabase, 'pair_members', identity.pairId),
         selectPairRows<BudgetGroup>(this.supabase, 'budget_groups', identity.pairId),
         selectPairRows<Activity>(this.supabase, 'activities', identity.pairId),
+        selectPairRows<DrawSession>(this.supabase, 'draw_sessions', identity.pairId),
         selectPairRows<ScheduledSession>(
           this.supabase,
           'scheduled_sessions',
@@ -410,6 +436,7 @@ export class SupabaseAppRepository implements AppRepository {
 
     const data: LocalAppData = {
       activities,
+      drawSessions,
       scheduledSessions,
       outcomes: outcomes.map(fromOutcomeRow),
       weeklyActivityBans: bans,
@@ -491,6 +518,96 @@ async function deletePairScopedRows(
   }
 }
 
+async function applyRemoteDeleteHints(
+  supabase: SupabaseClient,
+  pairId: string,
+  deleteHints: RemoteDeleteHints,
+) {
+  const banDeletes = uniqueBy(
+    deleteHints.weeklyActivityBans ?? [],
+    (ban) => `${ban.drawSessionId}:${ban.memberId}:${ban.activityId}`,
+  );
+  for (const ban of banDeletes) {
+    await deleteWeeklyActivityBan(supabase, pairId, ban);
+  }
+
+  const activityIds = [...new Set(deleteHints.activityIds ?? [])];
+  for (const activityId of activityIds) {
+    await deleteOrPauseRemoteActivity(supabase, pairId, activityId);
+  }
+}
+
+async function deleteWeeklyActivityBan(
+  supabase: SupabaseClient,
+  pairId: string,
+  ban: {
+    drawSessionId: string;
+    memberId: string;
+    activityId: string;
+  },
+) {
+  const { error } = await supabase
+    .from('weekly_activity_bans')
+    .delete()
+    .eq('pair_id', pairId)
+    .eq('draw_session_id', ban.drawSessionId)
+    .eq('member_id', ban.memberId)
+    .eq('activity_id', ban.activityId);
+  if (error) {
+    throw error;
+  }
+}
+
+async function deleteOrPauseRemoteActivity(
+  supabase: SupabaseClient,
+  pairId: string,
+  activityId: string,
+) {
+  const [activities, scheduledSessions, outcomes, bans] = await Promise.all([
+    selectPairRows<Activity>(supabase, 'activities', pairId),
+    selectPairRows<ScheduledSession>(supabase, 'scheduled_sessions', pairId),
+    selectPairRows<SessionOutcomeRow>(supabase, 'session_outcomes', pairId),
+    selectPairRows<WeeklyActivityBan>(supabase, 'weekly_activity_bans', pairId),
+  ]);
+  const activity = activities.find((candidate) => candidate.id === activityId);
+  if (!activity) {
+    return;
+  }
+
+  const referenced =
+    scheduledSessions.some((session) => session.activity_id === activityId) ||
+    outcomes.some((outcome) => outcome.replacement_activity_id === activityId) ||
+    bans.some((ban) => ban.activity_id === activityId);
+
+  if (referenced) {
+    await assertNoError(
+      supabase.from('activities').upsert({ ...activity, status: 'paused' }),
+    );
+    return;
+  }
+
+  const { error } = await supabase
+    .from('activities')
+    .delete()
+    .eq('pair_id', pairId)
+    .eq('id', activityId);
+  if (error) {
+    throw error;
+  }
+}
+
+function uniqueBy<T>(items: T[], keyForItem: (item: T) => string) {
+  const seen = new Set<string>();
+  return items.filter((item) => {
+    const key = keyForItem(item);
+    if (seen.has(key)) {
+      return false;
+    }
+    seen.add(key);
+    return true;
+  });
+}
+
 function toOutcomeRow(outcome: SessionOutcome, pairId: string): SessionOutcomeRow {
   return { ...outcome, pair_id: pairId };
 }
@@ -514,6 +631,11 @@ function scopeDataForPair(
       ...activity,
       pair_id: identity.pairId,
       created_by_member_id: safeMemberId(activity.created_by_member_id),
+    })),
+    drawSessions: data.drawSessions.map((drawSession) => ({
+      ...drawSession,
+      pair_id: identity.pairId,
+      created_by_member_id: safeMemberId(drawSession.created_by_member_id),
     })),
     scheduledSessions: data.scheduledSessions.map((session) => ({
       ...session,

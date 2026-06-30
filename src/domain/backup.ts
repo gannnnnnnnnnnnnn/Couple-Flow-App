@@ -1,4 +1,4 @@
-import type { LocalAppData } from './localPersistence';
+import { normalizeLocalAppData, type LocalAppData } from './localPersistence';
 
 export const BACKUP_SCHEMA_VERSION = 1;
 
@@ -38,7 +38,9 @@ export function parseAppBackupJson(raw: string): BackupParseResult {
     return { ok: false, error: '备份文件不是 Couple Flow 的可导入数据。' };
   }
 
-  return { ok: true, backup: cloneData(parsed) };
+  const backup = cloneData(parsed);
+  backup.data = normalizeLocalAppData(backup.data);
+  return { ok: true, backup };
 }
 
 function cloneData<T>(data: T): T {
@@ -67,6 +69,7 @@ function isLocalAppData(value: unknown): value is LocalAppData {
   const candidate = value as Partial<LocalAppData>;
   return (
     Array.isArray(candidate.activities) &&
+    (candidate.drawSessions === undefined || Array.isArray(candidate.drawSessions)) &&
     Array.isArray(candidate.scheduledSessions) &&
     Array.isArray(candidate.outcomes) &&
     Array.isArray(candidate.weeklyActivityBans) &&

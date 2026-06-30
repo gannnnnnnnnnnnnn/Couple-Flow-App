@@ -41,4 +41,17 @@ describe('autosave helpers', () => {
       }),
     ).toBe(false);
   });
+
+  it('does not skip an identical snapshot while remote delete hints are pending', () => {
+    const fingerprint = getLocalAppDataFingerprint(createDemoLocalAppData());
+
+    expect(
+      shouldSkipAutosaveForSnapshot({
+        currentFingerprint: fingerprint,
+        hasPendingRemoteDeletes: true,
+        lastSavedFingerprint: fingerprint,
+        remoteFingerprint: fingerprint,
+      }),
+    ).toBe(false);
+  });
 });

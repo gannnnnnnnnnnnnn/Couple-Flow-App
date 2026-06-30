@@ -33,6 +33,9 @@
 - [x] Settings supports explicit shared Supabase clear that preserves pair identity, members, and budget groups.
 - [x] Activity Pool supports faster mobile quick-add entry.
 - [x] Activity Pool supports editing, safe deletion, and pause fallback for referenced activities.
+- [x] Paired Draw locks the acting member to the stored device identity.
+- [x] Paired Draw renders 我的屏蔽 as editable and 对方的屏蔽 as read-only.
+- [x] Draw realtime applies shared changes without navigating, resetting draw results, or jumping week/budget controls.
 - [x] JSON backup export/import exists for local mode with shape validation.
 - [x] No photos, maps, payments, or push notifications.
 
@@ -43,13 +46,16 @@
 - [x] Week storage uses `target_week_start_date`, not week numbers.
 - [x] Replacement/redraw outcomes include both-member agreement.
 - [x] V0 uses per-member activity bans instead of unavailable time windows.
-- [x] Local storage persists activities, scheduled sessions, outcomes, weekly activity bans, target week, and budget filter.
+- [x] Local storage persists activities, draw sessions, scheduled sessions, outcomes, weekly activity bans, target week, and budget filter.
 - [x] Supabase schema includes pairs, pair members, budget groups, activities, draw sessions, weekly activity bans, scheduled sessions, and session outcomes.
 - [x] Repository layer preserves localStorage fallback and keeps Supabase calls out of UI leaf components.
 - [x] Pair-code join hydrates remote state before autosave can run.
 - [x] Pair-code create intentionally migrates current local state once.
-- [x] Normal Supabase autosave is upsert-only and does not delete remote-only rows.
-- [x] Explicit shared clear is the only V0 path that deletes pair-scoped Supabase activities, plans, bans, and outcomes.
+- [x] Normal Supabase autosave keeps remote-only rows unless an explicit UI delete hint scopes the delete.
+- [x] Explicit shared clear deletes pair-scoped Supabase activities, plans, bans, draw sessions, and outcomes.
+- [x] Removed own weekly bans delete only the matching pair/draw/member/activity row and stay deleted after reload.
+- [x] Activity delete sync deletes unreferenced activities remotely and pauses referenced activities instead.
+- [x] Draw sessions carry a per-target-week `idle` / `drawing` / `revealed` / `accepted` guard.
 - [x] Autosave is debounced and skips immediate saves after identical remote snapshots are applied.
 - [x] `.env.example` contains placeholders only.
 - [x] `.gitignore` excludes `.env`, `.env.local`, and `.env.*.local`.

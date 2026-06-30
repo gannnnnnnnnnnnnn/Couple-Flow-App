@@ -54,7 +54,7 @@ export interface DrawSession {
   pair_id: string;
   target_week_start_date: string;
   created_by_member_id: string;
-  status: 'draft' | 'accepted' | 'cancelled';
+  status: 'idle' | 'drawing' | 'revealed' | 'accepted';
   created_at: string;
 }
 

@@ -10,6 +10,7 @@ Couple Flow stays fully usable in local mode when Supabase env vars are missing.
 4. In Supabase, open Database > Replication.
 5. Enable Realtime replication for these tables:
    - `activities`
+   - `draw_sessions`
    - `scheduled_sessions`
    - `session_outcomes`
    - `weekly_activity_bans`
@@ -36,7 +37,7 @@ Couple Flow stays fully usable in local mode when Supabase env vars are missing.
 - Env vars missing or typo: confirm `.env.local` exists at the project root and uses the exact names from `.env.example`.
 - Dev server not restarted: stop and restart Vite after changing `.env.local`; Vite reads env vars at startup.
 - Pair code not found: copy the code from the connected device again, avoid extra spaces, and make sure both devices use the same Supabase project.
-- Realtime not updating: confirm replication is enabled for `activities`, `scheduled_sessions`, `session_outcomes`, `weekly_activity_bans`, and `pair_members`.
+- Realtime not updating: confirm replication is enabled for `activities`, `draw_sessions`, `scheduled_sessions`, `session_outcomes`, `weekly_activity_bans`, and `pair_members`.
 - One device still in local mode: open Settings on that device and confirm it does not still say `Local only: Supabase env missing`.
 - Browser localStorage has stale pair identity: use Settings > Disconnect this device, then create or join the pair again.
 

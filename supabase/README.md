@@ -8,6 +8,7 @@ This is the first shared-sync layer for Couple Flow. It is not production-grade 
 2. Open the SQL editor and run `supabase/schema.sql`.
 3. Enable Realtime replication for:
    - `activities`
+   - `draw_sessions`
    - `scheduled_sessions`
    - `session_outcomes`
    - `weekly_activity_bans`
@@ -24,7 +25,7 @@ When those env vars are missing, the app stays in local demo mode and uses `loca
 
 - Joining a pair loads the remote snapshot first; local demo data does not overwrite the shared pair.
 - Creating a pair intentionally migrates the current local app data into the new pair once.
-- Normal V0 autosave is conservative and upsert-only. Remote deletes are deferred until an explicit user action and stricter authorization rules exist.
+- Normal V0 autosave is conservative: it keeps remote-only rows unless an explicit UI action scopes a delete. Removed own weekly bans delete by pair/draw/member/activity, unreferenced activity deletes remove the remote activity, and referenced activity deletes pause it instead.
 
 ## Pair Code V0
 
