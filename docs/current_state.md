@@ -14,6 +14,9 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Local app data is persisted in `localStorage` through a small domain layer for activities, draw sessions, scheduled sessions, outcomes, weekly activity bans, target week, and budget filter.
 - First run without saved local data seeds from demo mock data so the phone app is usable immediately.
 - Users can explicitly choose a blank start; that device stores `couple-flow.demo-disabled.v1` so missing local data no longer reseeds demo rows after an intentional empty start.
+- A top-level React error boundary catches render/runtime failures and shows a Chinese recovery screen with reload and owned-storage repair actions.
+- The repair action clears only `couple-flow.` localStorage keys after warning that unsynced local device data will be deleted.
+- Local saved-state loading is defensive: corrupt JSON, missing `drawSessions`, old draw statuses, invalid arrays, invalid target weeks, and invalid budget filters fall back to safe state instead of crashing boot.
 - Settings shows local/save/sync status and includes confirmed controls for reset, disconnect, device clear, JSON export, and JSON import.
 - Settings includes a confirmed local `从空白开始` action and a connected `清空双人空间数据` action.
 - When connected to a pair, demo reset and JSON import are disabled so shared Supabase data cannot be accidentally overwritten from Settings.
@@ -27,8 +30,11 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - `vercel.json` rewrites browser refreshes back to the Vite app shell.
 - When Supabase env vars are present, Settings can create or join a V0 pair code with a local display name and stores the current pair/member identity locally.
 - Settings clearly separates local-only, sync-available, connected, delayed syncing, last-saved, and sync-error states.
+- When a device is local-only or not yet paired, the app persistently warns `当前只保存在这台设备，清除浏览器数据会丢失。` with a nearby `导出备份` action.
+- Any Settings action that clears local device state warns `这会删除这台设备上尚未同步的数据。已同步到双人空间的数据不会受影响。`
 - Connected Settings shows the current pair code, display name, status, last saved time, and a copy-code action with a browser clipboard fallback.
 - App data writes through a repository layer with localStorage fallback and Supabase CRUD/realtime support for activities, draw sessions, scheduled sessions, session outcomes, and weekly activity bans.
+- Supabase snapshot/realtime load failures fall back to the visible local app state and surface the recovery message in Settings instead of blank-screening.
 - Pair-code join/create hydrates a complete repository snapshot before App autosave resumes, so joining a pair does not overwrite remote data with stale local demo data.
 - Normal Supabase autosave is debounced, suppresses identical realtime-applied snapshots, keeps remote-only rows unless there is an explicit UI delete hint, and scopes member-ban deletes by pair, draw session, member, and activity.
 - Week Board keeps past open sessions visible under Needs Review / Overdue until an outcome is recorded.
@@ -57,7 +63,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Validation
 
 - `npm ci` passed on 2026-06-30.
-- `npm test` passed on 2026-06-30: 10 files, 59 tests.
+- `npm test` passed on 2026-06-30: 11 files, 69 tests.
 - `npm run build` passed on 2026-06-30.
 
 ## Known Gaps

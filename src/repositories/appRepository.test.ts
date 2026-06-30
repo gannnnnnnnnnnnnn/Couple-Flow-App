@@ -4,7 +4,11 @@ import {
   getLocalAppDataFingerprint,
   shouldSkipAutosaveForSnapshot,
 } from '../domain/autosave';
-import { createDemoLocalAppData } from '../domain/localPersistence';
+import {
+  createDemoLocalAppData,
+  savePairIdentity,
+  type StorageLike,
+} from '../domain/localPersistence';
 import {
   LocalAppRepository,
   SupabaseAppRepository,
@@ -122,6 +126,36 @@ class FakeSupabase {
 
   removeChannel() {
     return Promise.resolve();
+  }
+}
+
+class MemoryStorage implements StorageLike {
+  private values = new Map<string, string>();
+
+  getItem(key: string) {
+    return this.values.get(key) ?? null;
+  }
+
+  removeItem(key: string) {
+    this.values.delete(key);
+  }
+
+  setItem(key: string, value: string) {
+    this.values.set(key, value);
+  }
+}
+
+class FailingSupabase {
+  from() {
+    const failure = { data: null, error: { message: '远端数据表还没准备好。' } };
+    return {
+      select: () => ({
+        eq: () => ({
+          maybeSingle: () => Promise.resolve(failure),
+          returns: () => Promise.resolve(failure),
+        }),
+      }),
+    };
   }
 }
 
@@ -303,6 +337,40 @@ describe('repository helpers', () => {
     expect(fake.tables.activities).toEqual([
       expect.objectContaining({ id: 'activity-remote-only' }),
     ]);
+  });
+
+  it('Supabase load failure returns a visible local recovery snapshot', async () => {
+    const storage = new MemoryStorage();
+    const originalWindow = globalThis.window;
+    savePairIdentity(
+      {
+        pairId: 'pair-remote',
+        memberId: 'member-existing',
+        pairCode: 'ABC123',
+        displayName: 'Existing',
+      },
+      storage,
+    );
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { localStorage: storage },
+    });
+
+    try {
+      const repository = new SupabaseAppRepository(
+        new FailingSupabase() as unknown as SupabaseClient,
+      );
+      const snapshot = await repository.loadSnapshot();
+
+      expect(snapshot.data.activities.length).toBeGreaterThan(0);
+      expect(snapshot.identity?.pairId).toBe('pair-remote');
+      expect(snapshot.syncError).toBe('远端数据表还没准备好。');
+    } finally {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: originalWindow,
+      });
+    }
   });
 
   it('deletes removed own weekly bans even if realtime matched before debounce', async () => {

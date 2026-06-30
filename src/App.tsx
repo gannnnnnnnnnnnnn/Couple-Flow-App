@@ -14,6 +14,7 @@ import {
   shouldSkipAutosaveForSnapshot,
 } from './domain/autosave';
 import type { ImportDataResult } from './domain/settingsSafety';
+import { LOCAL_DEVICE_CLEAR_WARNING } from './domain/settingsSafety';
 import {
   classifySessions,
   createOutcome,
@@ -258,6 +259,7 @@ function App() {
     setActiveBudgetGroups(snapshot.budgetGroups);
     setPairIdentity(snapshot.identity);
     setRepositoryMode(snapshot.mode);
+    setSyncError(snapshot.syncError ?? null);
   }
 
   function getCurrentAppData(): LocalAppData {
@@ -441,7 +443,7 @@ function App() {
     }
 
     const confirmed = window.confirm(
-      '要把这台设备恢复成演示数据吗？本机改动会被替换。',
+      `${LOCAL_DEVICE_CLEAR_WARNING}\n\n要把这台设备恢复成演示数据吗？`,
     );
 
     if (!confirmed) {
@@ -455,8 +457,8 @@ function App() {
   async function startFromScratch() {
     const confirmed = window.confirm(
       pairIdentity
-        ? '确定要清空这个双人空间的数据吗？这会删除两个人共享的活动、计划、屏蔽项和记录，但会保留配对码和成员。'
-        : '要从空白开始吗？这会清空本机演示活动、计划和记录，但不会影响云端数据。',
+        ? `${LOCAL_DEVICE_CLEAR_WARNING}\n\n确定要清空这个双人空间的数据吗？这会删除两个人共享的活动、计划、屏蔽项和记录，但会保留配对码和成员。`
+        : `${LOCAL_DEVICE_CLEAR_WARNING}\n\n要从空白开始吗？这会清空本机演示活动、计划和记录，但不会影响云端数据。`,
     );
 
     if (!confirmed) {
@@ -514,8 +516,8 @@ function App() {
   function clearLocalUserData() {
     const confirmed = window.confirm(
       pairIdentity
-        ? '要断开这台设备吗？云端双人数据不会被删除或改动。'
-        : '要清空这台设备上的数据吗？云端数据不会受影响。',
+        ? `${LOCAL_DEVICE_CLEAR_WARNING}\n\n要断开这台设备吗？云端双人数据不会被删除或改动。`
+        : `${LOCAL_DEVICE_CLEAR_WARNING}\n\n要清空这台设备上的数据吗？云端数据不会受影响。`,
     );
 
     if (!confirmed) {
@@ -764,6 +766,20 @@ function App() {
       onNavigate={setActiveScreen}
       pair={activePair}
     >
+      {(!repository.hasRemoteEnv || !pairIdentity) && (
+        <div className="mb-4 rounded-md bg-butter/45 p-3 shadow-sm">
+          <p className="text-sm font-black text-ink">
+            当前只保存在这台设备，清除浏览器数据会丢失。
+          </p>
+          <button
+            className="mt-2 h-10 rounded-md bg-ink px-4 text-sm font-bold text-cream"
+            type="button"
+            onClick={exportAppData}
+          >
+            导出备份
+          </button>
+        </div>
+      )}
       {activeScreen === 'board' && (
         <WeekBoard
           activityById={activityById}

@@ -1,5 +1,6 @@
 import type { RealtimeChannel, SupabaseClient } from '@supabase/supabase-js';
 import { createClient } from '@supabase/supabase-js';
+import { clearCoupleFlowStorage } from '../domain/appStorage';
 import {
   budgetGroups as demoBudgetGroups,
   members as demoMembers,
@@ -16,8 +17,6 @@ import type {
   WeeklyActivityBan,
 } from '../types';
 import {
-  clearLocalAppData,
-  clearPairIdentity,
   createEmptyLocalAppData,
   createDemoLocalAppData,
   disableDemoSeed,
@@ -38,6 +37,7 @@ export interface RepositorySnapshot extends LocalStateLoadResult {
   budgetGroups: BudgetGroup[];
   identity: PairIdentity | null;
   mode: RepositoryMode;
+  syncError?: string;
 }
 
 export interface SaveResult {
@@ -193,8 +193,7 @@ export class LocalAppRepository implements AppRepository {
   }
 
   clearLocalData() {
-    clearLocalAppData();
-    clearPairIdentity();
+    clearCoupleFlowStorage();
   }
 
   subscribeToPair() {
@@ -214,7 +213,15 @@ export class SupabaseAppRepository implements AppRepository {
       return localSnapshot('supabase');
     }
 
-    return this.loadSupabaseSnapshot(identity);
+    try {
+      return await this.loadSupabaseSnapshot(identity);
+    } catch (error) {
+      return {
+        ...localSnapshot('supabase'),
+        identity,
+        syncError: getErrorMessage(error, '同步载入失败，请稍后重试。'),
+      };
+    }
   }
 
   async saveSnapshot(
@@ -366,8 +373,7 @@ export class SupabaseAppRepository implements AppRepository {
   }
 
   clearLocalData() {
-    clearLocalAppData();
-    clearPairIdentity();
+    clearCoupleFlowStorage();
   }
 
   subscribeToPair(identity: PairIdentity, onSnapshot: (snapshot: RepositorySnapshot) => void) {
@@ -403,7 +409,15 @@ export class SupabaseAppRepository implements AppRepository {
           filter: `pair_id=eq.${identity.pairId}`,
         },
         () => {
-          void this.loadSupabaseSnapshot(identity).then(onSnapshot);
+          void this.loadSupabaseSnapshot(identity)
+            .then(onSnapshot)
+            .catch((error: Error) => {
+              onSnapshot({
+                ...localSnapshot('supabase'),
+                identity,
+                syncError: getErrorMessage(error, '同步更新失败，请稍后重试。'),
+              });
+            });
         },
       )
       .subscribe();
@@ -606,6 +620,21 @@ function uniqueBy<T>(items: T[], keyForItem: (item: T) => string) {
     seen.add(key);
     return true;
   });
+}
+
+function getErrorMessage(error: unknown, fallback: string) {
+  if (error instanceof Error && error.message) {
+    return error.message;
+  }
+
+  if (error && typeof error === 'object' && 'message' in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === 'string' && message) {
+      return message;
+    }
+  }
+
+  return fallback;
 }
 
 function toOutcomeRow(outcome: SessionOutcome, pairId: string): SessionOutcomeRow {

@@ -26,6 +26,10 @@
 - [x] Phone usage docs cover same-URL pairing, no shared Wi-Fi requirement, network expectations, and add-to-home-screen.
 - [x] Vercel SPA refreshes route back to the app shell.
 - [x] Settings distinguishes local-only, sync-available, connected, syncing, last-saved, and sync-error states.
+- [x] App has a top-level Chinese error boundary with reload and owned-storage repair actions.
+- [x] App repair and Settings local-device clear remove only Couple Flow-owned `couple-flow.` storage keys.
+- [x] Local-only or unpaired use shows a persistent warning with a nearby backup export action.
+- [x] Settings local-device clear actions warn about unsynced local data loss.
 - [x] Connected Settings shows the pair code and display name with a copy action.
 - [x] Settings disables demo reset and backup import while connected to a pair.
 - [x] Settings disconnect clears local device data without remote deletes.
@@ -47,8 +51,10 @@
 - [x] Replacement/redraw outcomes include both-member agreement.
 - [x] V0 uses per-member activity bans instead of unavailable time windows.
 - [x] Local storage persists activities, draw sessions, scheduled sessions, outcomes, weekly activity bans, target week, and budget filter.
+- [x] Local storage migration tolerates corrupt JSON, missing draw sessions, old draw statuses, invalid arrays, invalid target weeks, and invalid budget filters without crashing boot.
 - [x] Supabase schema includes pairs, pair members, budget groups, activities, draw sessions, weekly activity bans, scheduled sessions, and session outcomes.
 - [x] Repository layer preserves localStorage fallback and keeps Supabase calls out of UI leaf components.
+- [x] Supabase load/realtime failures keep the app visible and surface sync errors in Settings.
 - [x] Pair-code join hydrates remote state before autosave can run.
 - [x] Pair-code create intentionally migrates current local state once.
 - [x] Normal Supabase autosave keeps remote-only rows unless an explicit UI delete hint scopes the delete.
