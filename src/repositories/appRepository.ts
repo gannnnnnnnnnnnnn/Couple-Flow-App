@@ -104,6 +104,10 @@ export function normalizePairCode(code: string) {
   return code.trim().toUpperCase().replace(/[^A-Z0-9]/g, '');
 }
 
+export function normalizeDisplayName(name: string) {
+  return name.trim().toLocaleLowerCase();
+}
+
 function createId(prefix: string) {
   const id =
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -335,14 +339,23 @@ export class SupabaseAppRepository implements AppRepository {
       throw membersError;
     }
 
-    const member: PairMember = {
-      id: createId('member'),
-      pair_id: pair.id,
-      display_name: displayName.trim() || '我',
-      color: MEMBER_COLORS[existingMembers?.length ?? 0] ?? MEMBER_COLORS[0],
-      created_at: new Date().toISOString(),
-    };
-    await assertNoError(this.supabase.from('pair_members').insert(member));
+    const safeDisplayName = displayName.trim() || '我';
+    const matchingMember = (existingMembers ?? []).find(
+      (member) =>
+        normalizeDisplayName(member.display_name) === normalizeDisplayName(safeDisplayName),
+    );
+    const member: PairMember =
+      matchingMember ?? {
+        id: createId('member'),
+        pair_id: pair.id,
+        display_name: safeDisplayName,
+        color: MEMBER_COLORS[existingMembers?.length ?? 0] ?? MEMBER_COLORS[0],
+        created_at: new Date().toISOString(),
+      };
+
+    if (!matchingMember) {
+      await assertNoError(this.supabase.from('pair_members').insert(member));
+    }
 
     const identity = {
       pairId: pair.id,

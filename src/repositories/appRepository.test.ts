@@ -13,6 +13,7 @@ import {
   LocalAppRepository,
   SupabaseAppRepository,
   createPairCode,
+  normalizeDisplayName,
   normalizePairCode,
 } from './appRepository';
 
@@ -261,6 +262,10 @@ describe('repository helpers', () => {
     expect(normalizePairCode(' ab-12 c ')).toBe('AB12C');
   });
 
+  it('normalizes display names for member reuse', () => {
+    expect(normalizeDisplayName(' Existing ')).toBe('existing');
+  });
+
   it('creates readable six-character pair codes', () => {
     expect(createPairCode(() => 0.1)).toMatch(/^[A-Z0-9]{6}$/);
     expect(createPairCode(() => 0.1)).toHaveLength(6);
@@ -288,6 +293,38 @@ describe('repository helpers', () => {
           ),
       ),
     ).toEqual([]);
+  });
+
+  it('joining with the same display name reuses the existing member', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+
+    const snapshot = await repository.joinPairAndLoad('abc123', ' existing ');
+
+    expect(snapshot.identity?.memberId).toBe('member-existing');
+    expect(snapshot.identity?.displayName).toBe('Existing');
+    expect(
+      fake.operations.filter(
+        (operation) => operation.table === 'pair_members' && operation.type === 'insert',
+      ),
+    ).toEqual([]);
+    expect(fake.tables.pair_members).toHaveLength(1);
+  });
+
+  it('joining with a different display name creates a new member', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+
+    const snapshot = await repository.joinPairAndLoad('abc123', 'New member');
+
+    expect(snapshot.identity?.memberId).not.toBe('member-existing');
+    expect(snapshot.identity?.displayName).toBe('New member');
+    expect(
+      fake.operations.filter(
+        (operation) => operation.table === 'pair_members' && operation.type === 'insert',
+      ),
+    ).toHaveLength(1);
+    expect(fake.tables.pair_members).toHaveLength(2);
   });
 
   it('creating a pair intentionally migrates current local data', async () => {

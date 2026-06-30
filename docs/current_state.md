@@ -29,6 +29,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - `docs/phone_usage.md` documents the two-phone public-URL flow, pair-code create/join, network expectations, and add-to-home-screen usage.
 - `vercel.json` rewrites browser refreshes back to the Vite app shell.
 - When Supabase env vars are present, Settings can create or join a V0 pair code with a local display name and stores the current pair/member identity locally.
+- Joining an existing pair reuses a pair member with the same trimmed, case-insensitive display name to avoid duplicate avatars after local browser data is cleared.
 - Settings clearly separates local-only, sync-available, connected, delayed syncing, last-saved, and sync-error states.
 - When a device is local-only or not yet paired, the app persistently warns `当前只保存在这台设备，清除浏览器数据会丢失。` with a nearby `导出备份` action.
 - Any Settings action that clears local device state warns `这会删除这台设备上尚未同步的数据。已同步到双人空间的数据不会受影响。`
@@ -63,7 +64,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Validation
 
 - `npm ci` passed on 2026-06-30.
-- `npm test` passed on 2026-06-30: 11 files, 69 tests.
+- `npm test` passed on 2026-06-30: 11 files, 72 tests.
 - `npm run build` passed on 2026-06-30.
 
 ## Known Gaps
