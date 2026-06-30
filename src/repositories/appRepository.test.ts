@@ -58,6 +58,16 @@ class FakeSupabase {
         created_at: '2026-06-29T00:00:00.000Z',
       },
     ],
+    draw_sessions: [
+      {
+        id: 'draw-1',
+        pair_id: 'pair-remote',
+        target_week_start_date: '2026-06-29',
+        created_by_member_id: 'member-existing',
+        status: 'revealed',
+        created_at: '2026-06-29T00:00:00.000Z',
+      },
+    ],
     scheduled_sessions: [
       {
         id: 'session-remote',
@@ -163,27 +173,48 @@ class FakeQuery {
   }
 
   delete() {
-    const client = this.client;
-    const table = this.table;
-    return {
-      eq(column: string, value: unknown) {
-        client.operations.push({ table, type: 'delete' });
-        client.tables[table] = (client.tables[table] ?? []).filter(
-          (row) => row[column] !== value,
-        );
-        return Promise.resolve({ data: null, error: null });
-      },
-      in: () => {
-        client.operations.push({ table, type: 'delete' });
-        return Promise.resolve({ data: null, error: null });
-      },
-    };
+    return new FakeDeleteQuery(this.client, this.table);
   }
 
   private filteredRows() {
     return (this.client.tables[this.table] ?? []).filter((row) =>
       this.filters.every((filter) => row[filter.column] === filter.value),
     );
+  }
+}
+
+class FakeDeleteQuery implements PromiseLike<{ data: null; error: null }> {
+  private filters: { column: string; value: unknown }[] = [];
+
+  constructor(
+    private readonly client: FakeSupabase,
+    private readonly table: string,
+  ) {}
+
+  eq(column: string, value: unknown) {
+    this.filters.push({ column, value });
+    return this;
+  }
+
+  in(column: string, values: unknown[]) {
+    this.client.operations.push({ table: this.table, type: 'delete' });
+    this.client.tables[this.table] = (this.client.tables[this.table] ?? []).filter(
+      (row) => !values.includes(row[column]),
+    );
+    return Promise.resolve({ data: null, error: null });
+  }
+
+  then<TResult1 = { data: null; error: null }, TResult2 = never>(
+    onfulfilled?:
+      | ((value: { data: null; error: null }) => TResult1 | PromiseLike<TResult1>)
+      | null,
+    onrejected?: ((reason: unknown) => TResult2 | PromiseLike<TResult2>) | null,
+  ): PromiseLike<TResult1 | TResult2> {
+    this.client.operations.push({ table: this.table, type: 'delete' });
+    this.client.tables[this.table] = (this.client.tables[this.table] ?? []).filter(
+      (row) => !this.filters.every((filter) => row[filter.column] === filter.value),
+    );
+    return Promise.resolve({ data: null, error: null }).then(onfulfilled, onrejected);
   }
 }
 
@@ -270,6 +301,120 @@ describe('repository helpers', () => {
     ]);
   });
 
+  it('deletes removed own weekly bans with pair, draw, member, and activity scope', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+    const localData = createDemoLocalAppData();
+    localData.weeklyActivityBans = [];
+
+    await repository.saveSnapshot(
+      localData,
+      {
+        pairId: 'pair-remote',
+        memberId: 'member-existing',
+        pairCode: 'ABC123',
+        displayName: 'Existing',
+      },
+      {
+        weeklyActivityBans: [
+          {
+            drawSessionId: 'draw-1',
+            memberId: 'member-existing',
+            activityId: 'activity-remote-only',
+          },
+        ],
+      },
+    );
+
+    expect(fake.tables.weekly_activity_bans).toEqual([]);
+    const reloaded = await repository.joinPairAndLoad('ABC123', 'Reload');
+    expect(reloaded.data.weeklyActivityBans).toEqual([]);
+    expect(
+      fake.operations.filter(
+        (operation) => operation.table === 'weekly_activity_bans' && operation.type === 'delete',
+      ),
+    ).toHaveLength(1);
+  });
+
+  it('does not delete partner weekly bans without a matching member-scoped hint', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+    const localData = createDemoLocalAppData();
+    localData.weeklyActivityBans = [];
+
+    await repository.saveSnapshot(
+      localData,
+      {
+        pairId: 'pair-remote',
+        memberId: 'member-existing',
+        pairCode: 'ABC123',
+        displayName: 'Existing',
+      },
+      {
+        weeklyActivityBans: [
+          {
+            drawSessionId: 'draw-1',
+            memberId: 'member-other',
+            activityId: 'activity-remote-only',
+          },
+        ],
+      },
+    );
+
+    expect(fake.tables.weekly_activity_bans).toEqual([
+      expect.objectContaining({ id: 'ban-remote', member_id: 'member-existing' }),
+    ]);
+  });
+
+  it('deletes an unreferenced activity when the UI explicitly removed it', async () => {
+    const fake = new FakeSupabase();
+    fake.tables.scheduled_sessions = [];
+    fake.tables.session_outcomes = [];
+    fake.tables.weekly_activity_bans = [];
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+    const localData = createDemoLocalAppData();
+    localData.activities = [];
+
+    await repository.saveSnapshot(
+      localData,
+      {
+        pairId: 'pair-remote',
+        memberId: 'member-existing',
+        pairCode: 'ABC123',
+        displayName: 'Existing',
+      },
+      { activityIds: ['activity-remote-only'] },
+    );
+
+    expect(fake.tables.activities).toEqual(
+      expect.not.arrayContaining([
+        expect.objectContaining({ id: 'activity-remote-only' }),
+      ]),
+    );
+  });
+
+  it('pauses a remotely referenced activity instead of deleting it', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+    const localData = createDemoLocalAppData();
+    localData.activities = [];
+
+    await repository.saveSnapshot(
+      localData,
+      {
+        pairId: 'pair-remote',
+        memberId: 'member-existing',
+        pairCode: 'ABC123',
+        displayName: 'Existing',
+      },
+      { activityIds: ['activity-remote-only'] },
+    );
+
+    expect(fake.tables.activities).toEqual([
+      expect.objectContaining({ id: 'activity-remote-only', status: 'paused' }),
+    ]);
+  });
+
   it('local start from scratch returns empty app data', async () => {
     const repository = new LocalAppRepository();
 
@@ -301,6 +446,7 @@ describe('repository helpers', () => {
       'session_outcomes',
       'scheduled_sessions',
       'weekly_activity_bans',
+      'draw_sessions',
       'activities',
     ]);
     expect(snapshot.identity?.pairCode).toBe('ABC123');
@@ -312,6 +458,7 @@ describe('repository helpers', () => {
       expect.objectContaining({ id: 'budget-tiny' }),
     ]);
     expect(snapshot.data.activities).toEqual([]);
+    expect(snapshot.data.drawSessions).toEqual([]);
     expect(snapshot.data.scheduledSessions).toEqual([]);
     expect(snapshot.data.weeklyActivityBans).toEqual([]);
     expect(snapshot.data.outcomes).toEqual([]);

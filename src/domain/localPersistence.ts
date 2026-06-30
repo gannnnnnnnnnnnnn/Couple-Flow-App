@@ -1,5 +1,6 @@
 import {
   activities as demoActivities,
+  drawSessions as demoDrawSessions,
   scheduledSessions as demoScheduledSessions,
   sessionOutcomes as demoOutcomes,
   weeklyActivityBans as demoWeeklyActivityBans,
@@ -7,6 +8,7 @@ import {
 import type {
   Activity,
   BudgetFilter,
+  DrawSession,
   ScheduledSession,
   SessionOutcome,
   WeeklyActivityBan,
@@ -20,6 +22,7 @@ const DEFAULT_PAIR_TIMEZONE = 'Australia/Melbourne';
 
 export interface LocalAppData {
   activities: Activity[];
+  drawSessions: DrawSession[];
   scheduledSessions: ScheduledSession[];
   outcomes: SessionOutcome[];
   weeklyActivityBans: WeeklyActivityBan[];
@@ -62,6 +65,7 @@ function cloneData<T>(data: T): T {
 export function createDemoLocalAppData(): LocalAppData {
   return {
     activities: cloneData(demoActivities),
+    drawSessions: cloneData(demoDrawSessions),
     scheduledSessions: cloneData(demoScheduledSessions),
     outcomes: cloneData(demoOutcomes),
     weeklyActivityBans: cloneData(demoWeeklyActivityBans),
@@ -73,6 +77,7 @@ export function createDemoLocalAppData(): LocalAppData {
 export function createEmptyLocalAppData(now = new Date()): LocalAppData {
   return {
     activities: [],
+    drawSessions: [],
     scheduledSessions: [],
     outcomes: [],
     weeklyActivityBans: [],
@@ -156,7 +161,7 @@ export function loadLocalAppData(
   }
 
   return {
-    data: cloneData(persisted.data),
+    data: normalizeLocalAppData(persisted.data),
     source: 'saved',
     savedAt: persisted.savedAt,
     canPersist: true,
@@ -292,12 +297,20 @@ function isLocalAppData(value: unknown): value is LocalAppData {
   const candidate = value as Partial<LocalAppData>;
   return (
     Array.isArray(candidate.activities) &&
+    (candidate.drawSessions === undefined || Array.isArray(candidate.drawSessions)) &&
     Array.isArray(candidate.scheduledSessions) &&
     Array.isArray(candidate.outcomes) &&
     Array.isArray(candidate.weeklyActivityBans) &&
     typeof candidate.targetWeekStart === 'string' &&
     typeof candidate.budgetFilter === 'string'
   );
+}
+
+export function normalizeLocalAppData(data: LocalAppData): LocalAppData {
+  return {
+    ...cloneData(data),
+    drawSessions: Array.isArray(data.drawSessions) ? cloneData(data.drawSessions) : [],
+  };
 }
 
 function isPairIdentity(value: unknown): value is PairIdentity {

@@ -69,8 +69,10 @@ Each member may create up to two `weekly_activity_bans` per draw session in V0. 
 | `pair_id` | uuid | References `pairs.id` |
 | `target_week_start_date` | date | Week anchor in pair timezone |
 | `created_by_member_id` | uuid | References `pair_members.id` |
-| `status` | text | `draft`, `accepted`, or `cancelled` |
+| `status` | text | `idle`, `drawing`, `revealed`, or `accepted` |
 | `created_at` | timestamptz | Created time |
+
+V0 keeps one pragmatic `draw_sessions` state row per pair and target week so a second paired device can see that the partner is already drawing or has revealed a result, instead of starting a competing final draw.
 
 ### draw_candidates
 

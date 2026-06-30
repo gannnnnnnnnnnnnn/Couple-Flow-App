@@ -42,9 +42,13 @@ create table if not exists draw_sessions (
   pair_id text not null references pairs(id) on delete cascade,
   target_week_start_date date not null,
   created_by_member_id text not null references pair_members(id) on delete restrict,
-  status text not null check (status in ('draft', 'accepted', 'cancelled')),
+  status text not null check (status in ('idle', 'drawing', 'revealed', 'accepted')),
   created_at timestamptz not null default now()
 );
+
+alter table draw_sessions drop constraint if exists draw_sessions_status_check;
+alter table draw_sessions add constraint draw_sessions_status_check
+  check (status in ('idle', 'drawing', 'revealed', 'accepted'));
 
 create table if not exists weekly_activity_bans (
   id text primary key,
@@ -84,6 +88,9 @@ create table if not exists session_outcomes (
 create index if not exists pair_members_pair_id_idx on pair_members(pair_id);
 create index if not exists budget_groups_pair_id_idx on budget_groups(pair_id);
 create index if not exists activities_pair_id_idx on activities(pair_id);
+create index if not exists draw_sessions_pair_id_idx on draw_sessions(pair_id);
+create unique index if not exists draw_sessions_pair_week_idx
+  on draw_sessions(pair_id, target_week_start_date);
 create index if not exists weekly_activity_bans_pair_id_idx on weekly_activity_bans(pair_id);
 create index if not exists scheduled_sessions_pair_id_idx on scheduled_sessions(pair_id);
 create index if not exists session_outcomes_pair_id_idx on session_outcomes(pair_id);

@@ -150,7 +150,7 @@ export const drawSessions: DrawSession[] = [
     pair_id: pair.id,
     target_week_start_date: '2026-07-06',
     created_by_member_id: 'member-g',
-    status: 'draft',
+    status: 'idle',
     created_at: '2026-06-29T00:00:00.000Z',
   },
 ];

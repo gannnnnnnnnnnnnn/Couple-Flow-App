@@ -28,6 +28,25 @@ describe('app backup import/export', () => {
     }
   });
 
+  it('keeps older backups without draw sessions importable', () => {
+    const data = createDemoLocalAppData();
+    const { drawSessions: _drawSessions, ...oldData } = data;
+
+    const result = parseAppBackupJson(
+      JSON.stringify({
+        app: 'couple-flow',
+        schemaVersion: BACKUP_SCHEMA_VERSION,
+        exportedAt: '2026-06-29T12:00:00.000Z',
+        data: oldData,
+      }),
+    );
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.backup.data.drawSessions).toEqual([]);
+    }
+  });
+
   it('rejects invalid JSON', () => {
     expect(parseAppBackupJson('{nope').ok).toBe(false);
   });

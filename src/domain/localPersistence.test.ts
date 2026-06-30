@@ -94,6 +94,25 @@ describe('local persistence', () => {
     expect(result.data.targetWeekStart).toBe('2026-07-06');
   });
 
+  it('loads older saved app data without draw sessions', () => {
+    const storage = new MemoryStorage();
+    const data = createDemoLocalAppData();
+    const { drawSessions: _drawSessions, ...oldData } = data;
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: '2026-06-29T12:00:00.000Z',
+        data: oldData,
+      }),
+    );
+
+    const result = loadLocalAppData(storage);
+
+    expect(result.source).toBe('saved');
+    expect(result.data.drawSessions).toEqual([]);
+  });
+
   it('falls back to demo data for invalid saved payloads', () => {
     const storage = new MemoryStorage();
     storage.setItem(LOCAL_STATE_STORAGE_KEY, '{"version":1,"data":{"activities":[]}}');
