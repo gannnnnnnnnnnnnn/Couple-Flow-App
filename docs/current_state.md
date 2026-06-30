@@ -36,6 +36,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Connected Settings shows the current pair code, display name, status, last saved time, and a copy-code action with a browser clipboard fallback.
 - App data writes through a repository layer with localStorage fallback and Supabase CRUD/realtime support for activities, draw sessions, scheduled sessions, session outcomes, and weekly activity bans.
 - Supabase snapshot/realtime load failures fall back to the visible local app state and surface the recovery message in Settings instead of blank-screening.
+- Supabase recovery fallback snapshots are blocked from autosave so local/demo/stale recovery data cannot overwrite remote pair data.
 - Pair-code join/create hydrates a complete repository snapshot before App autosave resumes, so joining a pair does not overwrite remote data with stale local demo data.
 - Normal Supabase autosave is debounced, suppresses identical realtime-applied snapshots, keeps remote-only rows unless there is an explicit UI delete hint, and scopes member-ban deletes by pair, draw session, member, and activity.
 - Week Board keeps past open sessions visible under Needs Review / Overdue until an outcome is recorded.
@@ -64,7 +65,7 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Validation
 
 - `npm ci` passed on 2026-06-30.
-- `npm test` passed on 2026-06-30: 11 files, 72 tests.
+- `npm test` passed on 2026-06-30: 11 files, 73 tests.
 - `npm run build` passed on 2026-06-30.
 
 ## Known Gaps

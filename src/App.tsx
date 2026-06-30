@@ -114,6 +114,7 @@ function App() {
   const [repositoryMode, setRepositoryMode] = useState<RepositoryMode>(repository.mode);
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState<string | null>(null);
+  const [autosaveBlockedByRecovery, setAutosaveBlockedByRecovery] = useState(false);
   const [hydrating, setHydrating] = useState(true);
   const lastSavedFingerprintRef = useRef<string | null>(null);
   const remoteSnapshotFingerprintRef = useRef<string | null>(null);
@@ -260,6 +261,7 @@ function App() {
     setPairIdentity(snapshot.identity);
     setRepositoryMode(snapshot.mode);
     setSyncError(snapshot.syncError ?? null);
+    setAutosaveBlockedByRecovery(snapshot.mode === 'supabase' && Boolean(snapshot.syncError));
   }
 
   function getCurrentAppData(): LocalAppData {
@@ -344,6 +346,7 @@ function App() {
       shouldSkipAutosaveForSnapshot({
         currentFingerprint,
         hasPendingRemoteDeletes: hasPendingRemoteDeleteHints(),
+        isSyncRecoverySnapshot: autosaveBlockedByRecovery,
         lastSavedFingerprint: lastSavedFingerprintRef.current,
         remoteFingerprint: remoteSnapshotFingerprintRef.current,
       })
@@ -378,6 +381,7 @@ function App() {
           }
           setRepositoryMode(mode);
           setSyncError(null);
+          setAutosaveBlockedByRecovery(false);
         })
         .catch((error: Error) => {
           if (saveSequenceRef.current === saveId) {
@@ -402,6 +406,7 @@ function App() {
     };
   }, [
     activities,
+    autosaveBlockedByRecovery,
     bans,
     budgetFilter,
     drawSessions,
@@ -457,7 +462,7 @@ function App() {
   async function startFromScratch() {
     const confirmed = window.confirm(
       pairIdentity
-        ? `${LOCAL_DEVICE_CLEAR_WARNING}\n\n确定要清空这个双人空间的数据吗？这会删除两个人共享的活动、计划、屏蔽项和记录，但会保留配对码和成员。`
+        ? '确定要清空这个双人空间的数据吗？这会删除两个人共享的活动、计划、屏蔽项和记录，但会保留配对码和成员。'
         : `${LOCAL_DEVICE_CLEAR_WARNING}\n\n要从空白开始吗？这会清空本机演示活动、计划和记录，但不会影响云端数据。`,
     );
 
