@@ -1,5 +1,8 @@
 import type { PairIdentity } from './localPersistence';
 
+export const LOCAL_DEVICE_CLEAR_WARNING =
+  '这会删除这台设备上尚未同步的数据。已同步到双人空间的数据不会受影响。';
+
 export interface SettingsSafetyInput {
   hasRemoteEnv: boolean;
   identity: PairIdentity | null;
@@ -38,8 +41,7 @@ export function getSettingsSafetyCopy({
   if (identity) {
     return {
       clearActionLabel: '断开本设备',
-      clearConfirmation:
-        '要断开这台设备吗？云端双人数据不会被删除或改动。',
+      clearConfirmation: LOCAL_DEVICE_CLEAR_WARNING,
       resetDemoDisabled: true,
       resetDemoMessage: '已连接双人空间时不能重置演示数据。',
       syncStatusLabel: hasRemoteEnv
@@ -50,8 +52,7 @@ export function getSettingsSafetyCopy({
 
   return {
     clearActionLabel: '清空本机数据',
-    clearConfirmation:
-      '要清空这台设备上的数据吗？云端数据不会受影响。',
+    clearConfirmation: LOCAL_DEVICE_CLEAR_WARNING,
     resetDemoDisabled: false,
     resetDemoMessage: null,
     syncStatusLabel: hasRemoteEnv

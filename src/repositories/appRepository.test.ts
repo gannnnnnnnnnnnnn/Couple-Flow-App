@@ -4,11 +4,16 @@ import {
   getLocalAppDataFingerprint,
   shouldSkipAutosaveForSnapshot,
 } from '../domain/autosave';
-import { createDemoLocalAppData } from '../domain/localPersistence';
+import {
+  createDemoLocalAppData,
+  savePairIdentity,
+  type StorageLike,
+} from '../domain/localPersistence';
 import {
   LocalAppRepository,
   SupabaseAppRepository,
   createPairCode,
+  normalizeDisplayName,
   normalizePairCode,
 } from './appRepository';
 
@@ -125,6 +130,36 @@ class FakeSupabase {
   }
 }
 
+class MemoryStorage implements StorageLike {
+  private values = new Map<string, string>();
+
+  getItem(key: string) {
+    return this.values.get(key) ?? null;
+  }
+
+  removeItem(key: string) {
+    this.values.delete(key);
+  }
+
+  setItem(key: string, value: string) {
+    this.values.set(key, value);
+  }
+}
+
+class FailingSupabase {
+  from() {
+    const failure = { data: null, error: { message: '远端数据表还没准备好。' } };
+    return {
+      select: () => ({
+        eq: () => ({
+          maybeSingle: () => Promise.resolve(failure),
+          returns: () => Promise.resolve(failure),
+        }),
+      }),
+    };
+  }
+}
+
 class FakeQuery {
   private filters: { column: string; value: unknown }[] = [];
 
@@ -227,6 +262,10 @@ describe('repository helpers', () => {
     expect(normalizePairCode(' ab-12 c ')).toBe('AB12C');
   });
 
+  it('normalizes display names for member reuse', () => {
+    expect(normalizeDisplayName(' Existing ')).toBe('existing');
+  });
+
   it('creates readable six-character pair codes', () => {
     expect(createPairCode(() => 0.1)).toMatch(/^[A-Z0-9]{6}$/);
     expect(createPairCode(() => 0.1)).toHaveLength(6);
@@ -254,6 +293,38 @@ describe('repository helpers', () => {
           ),
       ),
     ).toEqual([]);
+  });
+
+  it('joining with the same display name reuses the existing member', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+
+    const snapshot = await repository.joinPairAndLoad('abc123', ' existing ');
+
+    expect(snapshot.identity?.memberId).toBe('member-existing');
+    expect(snapshot.identity?.displayName).toBe('Existing');
+    expect(
+      fake.operations.filter(
+        (operation) => operation.table === 'pair_members' && operation.type === 'insert',
+      ),
+    ).toEqual([]);
+    expect(fake.tables.pair_members).toHaveLength(1);
+  });
+
+  it('joining with a different display name creates a new member', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+
+    const snapshot = await repository.joinPairAndLoad('abc123', 'New member');
+
+    expect(snapshot.identity?.memberId).not.toBe('member-existing');
+    expect(snapshot.identity?.displayName).toBe('New member');
+    expect(
+      fake.operations.filter(
+        (operation) => operation.table === 'pair_members' && operation.type === 'insert',
+      ),
+    ).toHaveLength(1);
+    expect(fake.tables.pair_members).toHaveLength(2);
   });
 
   it('creating a pair intentionally migrates current local data', async () => {
@@ -303,6 +374,40 @@ describe('repository helpers', () => {
     expect(fake.tables.activities).toEqual([
       expect.objectContaining({ id: 'activity-remote-only' }),
     ]);
+  });
+
+  it('Supabase load failure returns a visible local recovery snapshot', async () => {
+    const storage = new MemoryStorage();
+    const originalWindow = globalThis.window;
+    savePairIdentity(
+      {
+        pairId: 'pair-remote',
+        memberId: 'member-existing',
+        pairCode: 'ABC123',
+        displayName: 'Existing',
+      },
+      storage,
+    );
+    Object.defineProperty(globalThis, 'window', {
+      configurable: true,
+      value: { localStorage: storage },
+    });
+
+    try {
+      const repository = new SupabaseAppRepository(
+        new FailingSupabase() as unknown as SupabaseClient,
+      );
+      const snapshot = await repository.loadSnapshot();
+
+      expect(snapshot.data.activities.length).toBeGreaterThan(0);
+      expect(snapshot.identity?.pairId).toBe('pair-remote');
+      expect(snapshot.syncError).toBe('远端数据表还没准备好。');
+    } finally {
+      Object.defineProperty(globalThis, 'window', {
+        configurable: true,
+        value: originalWindow,
+      });
+    }
   });
 
   it('deletes removed own weekly bans even if realtime matched before debounce', async () => {

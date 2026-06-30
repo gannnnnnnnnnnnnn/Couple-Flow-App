@@ -54,4 +54,15 @@ describe('autosave helpers', () => {
       }),
     ).toBe(false);
   });
+
+  it('skips autosave while showing a Supabase recovery snapshot', () => {
+    expect(
+      shouldSkipAutosaveForSnapshot({
+        currentFingerprint: 'fallback-local-state',
+        isSyncRecoverySnapshot: true,
+        lastSavedFingerprint: null,
+        remoteFingerprint: null,
+      }),
+    ).toBe(true);
+  });
 });

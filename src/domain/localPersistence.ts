@@ -59,7 +59,11 @@ export interface PairIdentity {
 }
 
 function cloneData<T>(data: T): T {
-  return JSON.parse(JSON.stringify(data)) as T;
+  try {
+    return JSON.parse(JSON.stringify(data)) as T;
+  } catch {
+    return data;
+  }
 }
 
 export function createDemoLocalAppData(): LocalAppData {
@@ -266,17 +270,23 @@ export function clearPairIdentity(storage: StorageLike | null = getBrowserStorag
 export function parsePersistedLocalAppData(raw: string): PersistedLocalAppData | null {
   try {
     const parsed: unknown = JSON.parse(raw);
-    if (!isPersistedLocalAppData(parsed)) {
+    if (!isPersistedLocalAppDataContainer(parsed)) {
       return null;
     }
 
-    return parsed;
+    return {
+      version: 1,
+      savedAt: parsed.savedAt,
+      data: normalizeLocalAppData(parsed.data),
+    };
   } catch {
     return null;
   }
 }
 
-function isPersistedLocalAppData(value: unknown): value is PersistedLocalAppData {
+function isPersistedLocalAppDataContainer(
+  value: unknown,
+): value is { version: 1; savedAt: string; data: unknown } {
   if (!value || typeof value !== 'object') {
     return false;
   }
@@ -285,32 +295,51 @@ function isPersistedLocalAppData(value: unknown): value is PersistedLocalAppData
   return (
     candidate.version === 1 &&
     typeof candidate.savedAt === 'string' &&
-    isLocalAppData(candidate.data)
+    !!candidate.data &&
+    typeof candidate.data === 'object'
   );
 }
 
-function isLocalAppData(value: unknown): value is LocalAppData {
-  if (!value || typeof value !== 'object') {
+export function normalizeLocalAppData(data: Partial<LocalAppData> | unknown): LocalAppData {
+  const candidate = data && typeof data === 'object' ? (data as Partial<LocalAppData>) : {};
+  return {
+    activities: safeArray(candidate.activities),
+    drawSessions: safeArray(candidate.drawSessions).map(normalizeDrawSession),
+    scheduledSessions: safeArray(candidate.scheduledSessions),
+    outcomes: safeArray(candidate.outcomes),
+    weeklyActivityBans: safeArray(candidate.weeklyActivityBans),
+    targetWeekStart: isValidWeekStart(candidate.targetWeekStart)
+      ? candidate.targetWeekStart
+      : createEmptyLocalAppData().targetWeekStart,
+    budgetFilter:
+      typeof candidate.budgetFilter === 'string' && candidate.budgetFilter.trim()
+        ? candidate.budgetFilter
+        : 'all',
+  };
+}
+
+function safeArray<T>(value: T[] | undefined) {
+  return Array.isArray(value) ? cloneData(value) : [];
+}
+
+function normalizeDrawSession(drawSession: DrawSession | Record<string, unknown>): DrawSession {
+  const rawStatus = drawSession.status;
+  return {
+    ...drawSession,
+    status:
+      rawStatus === 'draft' || rawStatus === 'cancelled'
+        ? 'idle'
+        : rawStatus,
+  } as DrawSession;
+}
+
+function isValidWeekStart(value: unknown): value is string {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) {
     return false;
   }
 
-  const candidate = value as Partial<LocalAppData>;
-  return (
-    Array.isArray(candidate.activities) &&
-    (candidate.drawSessions === undefined || Array.isArray(candidate.drawSessions)) &&
-    Array.isArray(candidate.scheduledSessions) &&
-    Array.isArray(candidate.outcomes) &&
-    Array.isArray(candidate.weeklyActivityBans) &&
-    typeof candidate.targetWeekStart === 'string' &&
-    typeof candidate.budgetFilter === 'string'
-  );
-}
-
-export function normalizeLocalAppData(data: LocalAppData): LocalAppData {
-  return {
-    ...cloneData(data),
-    drawSessions: Array.isArray(data.drawSessions) ? cloneData(data.drawSessions) : [],
-  };
+  const date = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(date.getTime()) && value === date.toISOString().slice(0, 10);
 }
 
 function isPairIdentity(value: unknown): value is PairIdentity {

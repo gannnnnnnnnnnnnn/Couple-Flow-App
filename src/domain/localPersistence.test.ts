@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { clearCoupleFlowStorage } from './appStorage';
 import {
   LOCAL_STATE_STORAGE_KEY,
   clearLocalAppData,
@@ -15,8 +16,16 @@ import {
 class MemoryStorage implements StorageLike {
   private values = new Map<string, string>();
 
+  get length() {
+    return this.values.size;
+  }
+
   getItem(key: string) {
     return this.values.get(key) ?? null;
+  }
+
+  key(index: number) {
+    return [...this.values.keys()][index] ?? null;
   }
 
   setItem(key: string, value: string) {
@@ -113,6 +122,115 @@ describe('local persistence', () => {
     expect(result.data.drawSessions).toEqual([]);
   });
 
+  it('migrates old draft draw session status to idle', () => {
+    const storage = new MemoryStorage();
+    const data = createDemoLocalAppData();
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: '2026-06-29T12:00:00.000Z',
+        data: {
+          ...data,
+          drawSessions: [{ ...data.drawSessions[0], status: 'draft' }],
+        },
+      }),
+    );
+
+    expect(loadLocalAppData(storage).data.drawSessions[0].status).toBe('idle');
+  });
+
+  it('migrates old cancelled draw session status to idle', () => {
+    const storage = new MemoryStorage();
+    const data = createDemoLocalAppData();
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: '2026-06-29T12:00:00.000Z',
+        data: {
+          ...data,
+          drawSessions: [{ ...data.drawSessions[0], status: 'cancelled' }],
+        },
+      }),
+    );
+
+    expect(loadLocalAppData(storage).data.drawSessions[0].status).toBe('idle');
+  });
+
+  it('falls invalid arrays back to empty arrays', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: '2026-06-29T12:00:00.000Z',
+        data: {
+          activities: 'bad',
+          drawSessions: null,
+          scheduledSessions: {},
+          outcomes: false,
+          weeklyActivityBans: 12,
+          targetWeekStart: '2026-07-06',
+          budgetFilter: 'all',
+        },
+      }),
+    );
+
+    const result = loadLocalAppData(storage);
+
+    expect(result.source).toBe('saved');
+    expect(result.data.activities).toEqual([]);
+    expect(result.data.drawSessions).toEqual([]);
+    expect(result.data.scheduledSessions).toEqual([]);
+    expect(result.data.outcomes).toEqual([]);
+    expect(result.data.weeklyActivityBans).toEqual([]);
+  });
+
+  it('falls invalid budget and target week back to safe defaults', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: '2026-06-29T12:00:00.000Z',
+        data: {
+          activities: [],
+          drawSessions: [],
+          scheduledSessions: [],
+          outcomes: [],
+          weeklyActivityBans: [],
+          targetWeekStart: 'not-a-week',
+          budgetFilter: 42,
+        },
+      }),
+    );
+
+    const result = loadLocalAppData(storage);
+
+    expect(result.data.budgetFilter).toBe('all');
+    expect(result.data.targetWeekStart).toMatch(/^\d{4}-\d{2}-\d{2}$/);
+  });
+
+  it('corrupt localStorage JSON does not throw or crash boot', () => {
+    const storage = new MemoryStorage();
+    storage.setItem(LOCAL_STATE_STORAGE_KEY, '{bad json');
+
+    expect(() => loadLocalAppData(storage)).not.toThrow();
+    expect(loadLocalAppData(storage).source).toBe('demo');
+  });
+
+  it('unsupported saved state returns empty state when demo is disabled', () => {
+    const storage = new MemoryStorage();
+    disableDemoSeed(storage);
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({ version: 999, savedAt: 'x', data: {} }),
+    );
+
+    expect(loadLocalAppData(storage).source).toBe('empty');
+  });
+
   it('falls back to demo data for invalid saved payloads', () => {
     const storage = new MemoryStorage();
     storage.setItem(LOCAL_STATE_STORAGE_KEY, '{"version":1,"data":{"activities":[]}}');
@@ -132,6 +250,18 @@ describe('local persistence', () => {
 
     expect(storage.getItem(LOCAL_STATE_STORAGE_KEY)).toBeNull();
     expect(loadLocalAppData(storage).source).toBe('demo');
+  });
+
+  it('clears only Couple Flow owned storage keys', () => {
+    const storage = new MemoryStorage();
+    storage.setItem('couple-flow.local-state.v1', 'a');
+    storage.setItem('couple-flow.pair-identity.v1', 'b');
+    storage.setItem('other-app', 'c');
+
+    expect(clearCoupleFlowStorage(storage)).toBe(2);
+    expect(storage.getItem('couple-flow.local-state.v1')).toBeNull();
+    expect(storage.getItem('couple-flow.pair-identity.v1')).toBeNull();
+    expect(storage.getItem('other-app')).toBe('c');
   });
 
   it('stores the current pair and member identity locally', () => {
