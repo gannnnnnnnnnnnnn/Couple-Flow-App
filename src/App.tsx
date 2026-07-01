@@ -17,6 +17,13 @@ import type { ImportDataResult } from './domain/settingsSafety';
 import { LOCAL_DEVICE_CLEAR_WARNING } from './domain/settingsSafety';
 import { drawOneActivity, getEligibleActivities } from './domain/draw';
 import {
+  APP_VERSION,
+  UPDATE_BUTTON_LABEL,
+  UPDATE_NOTICE,
+  fetchAppVersionManifest,
+  hasAppVersionMismatch,
+} from './domain/appVersion';
+import {
   classifySessions,
   createOutcome,
   createScheduledSession,
@@ -24,6 +31,7 @@ import {
   getFollowUpTargetWeek,
   getOutcomeBySessionId,
   isActivityReferenced,
+  upsertAcceptedDrawScheduledSession,
 } from './domain/state';
 import { getNextWeekStartDate, getWeekStartDate } from './domain/week';
 import {
@@ -37,6 +45,7 @@ import {
 } from './domain/localPersistence';
 import {
   agreeToPendingDrawAction,
+  applyDrawReplacementResult,
   canRequestDrawAction,
   getActingMemberId,
   getDrawSessionForWeek,
@@ -121,6 +130,7 @@ function App() {
   const [syncError, setSyncError] = useState<string | null>(null);
   const [autosaveBlockedByRecovery, setAutosaveBlockedByRecovery] = useState(false);
   const [hydrating, setHydrating] = useState(true);
+  const [updateAvailable, setUpdateAvailable] = useState(false);
   const lastSavedFingerprintRef = useRef<string | null>(null);
   const remoteSnapshotFingerprintRef = useRef<string | null>(null);
   const saveSequenceRef = useRef(0);
@@ -138,6 +148,7 @@ function App() {
     bans: [] as WeeklyActivityBan[],
   });
   const [drawNotice, setDrawNotice] = useState<string | null>(null);
+  const pendingDrawMutationKeyRef = useRef<string | null>(null);
 
   const currentWeekStart = useMemo(
     () => getWeekStartDate(new Date(), activePair.timezone),
@@ -438,6 +449,50 @@ function App() {
     );
   }, [pairIdentity, repository]);
 
+  useEffect(() => {
+    let cancelled = false;
+
+    async function checkAppVersion() {
+      const manifest = await fetchAppVersionManifest().catch(() => null);
+      if (!cancelled && hasAppVersionMismatch(APP_VERSION, manifest)) {
+        setUpdateAvailable(true);
+      }
+    }
+
+    function handleVisibilityChange() {
+      if (document.visibilityState === 'visible') {
+        void checkAppVersion();
+      }
+    }
+
+    function handleServiceWorkerMessage(event: MessageEvent) {
+      const data = event.data as { type?: string; version?: string } | null;
+      if (
+        data?.type === 'COUPLE_FLOW_VERSION_READY' &&
+        data.version &&
+        data.version !== APP_VERSION
+      ) {
+        setUpdateAvailable(true);
+      }
+    }
+
+    void checkAppVersion();
+    const versionTimer = window.setInterval(checkAppVersion, 10 * 60 * 1000);
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', handleServiceWorkerMessage);
+    }
+
+    return () => {
+      cancelled = true;
+      window.clearInterval(versionTimer);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      if ('serviceWorker' in navigator) {
+        navigator.serviceWorker.removeEventListener('message', handleServiceWorkerMessage);
+      }
+    };
+  }, []);
+
   function replaceLocalState(data = createDemoLocalAppData(), source: LocalStateSource = 'demo') {
     setActivities(data.activities);
     setDrawSessions(data.drawSessions);
@@ -587,6 +642,20 @@ function App() {
     setDrawNotice(null);
   }
 
+  function refreshToNewVersion() {
+    if ('serviceWorker' in navigator) {
+      void navigator.serviceWorker
+        .getRegistration()
+        .then((registration) => registration?.update())
+        .finally(() => {
+          window.location.reload();
+        });
+      return;
+    }
+
+    window.location.reload();
+  }
+
   function changeBudget(filter: BudgetFilter) {
     setBudgetFilter(filter);
     setDrawNotice(null);
@@ -669,83 +738,109 @@ function App() {
       return;
     }
 
-    finalizeAcceptedDraw(activity);
+    runDrawMutationOnce(`accept:${currentDrawSessionId}`, () => {
+      finalizeAcceptedDraw(activity);
+    });
   }
 
   function requestPendingDrawAction(actionType: PendingDrawAction) {
-    const drawSession = currentDrawSession;
-    const resultActivityId = drawSession?.result_activity_id ?? null;
-    if (!canRequestDrawAction(drawSession) || !resultActivityId) {
-      return;
-    }
-
-    if (!requiresPairedAgreement) {
-      if (actionType === 'reroll' || actionType === 'change') {
-        revealDraw(drawReplacementResult(resultActivityId));
+    runDrawMutationOnce(`request:${actionType}:${currentDrawSessionId}`, () => {
+      const drawSession = currentDrawSession;
+      const resultActivityId = drawSession?.result_activity_id ?? null;
+      if (!canRequestDrawAction(drawSession) || !resultActivityId) {
+        return;
       }
-      return;
-    }
 
-    setDrawSessions(
-      requestDrawAgreement({
-        drawSessions,
-        pairId: activePairId,
-        drawSessionId: currentDrawSessionId,
-        targetWeekStart: selectedTargetWeek,
-        actingMemberId: activeMemberId,
-        actionType,
-      }),
-    );
-    setDrawNotice(null);
+      if (!requiresPairedAgreement) {
+        if (actionType === 'reroll' || actionType === 'change') {
+          revealDraw(drawReplacementResult(resultActivityId));
+        }
+        return;
+      }
+
+      setDrawSessions(
+        requestDrawAgreement({
+          drawSessions,
+          pairId: activePairId,
+          drawSessionId: currentDrawSessionId,
+          targetWeekStart: selectedTargetWeek,
+          actingMemberId: activeMemberId,
+          actionType,
+        }),
+      );
+      setDrawNotice(null);
+    });
   }
 
   function agreePendingDrawAction() {
-    const result = agreeToPendingDrawAction({
-      drawSessions,
-      pairId: activePairId,
-      drawSessionId: currentDrawSessionId,
-      targetWeekStart: selectedTargetWeek,
-      actingMemberId: activeMemberId,
-      requiredMemberIds: pairedAgreementMemberIds,
-    });
-    setDrawSessions(result.drawSessions);
-
-    if (result.completedAction === 'accept' && currentDrawResult) {
-      finalizeAcceptedDraw(currentDrawResult);
-      return;
-    }
-
-    if (result.completedAction === 'reroll' || result.completedAction === 'change') {
-      revealDraw(drawReplacementResult(currentDrawSession?.result_activity_id ?? null));
-    }
-  }
-
-  function rejectPendingDraw() {
-    setDrawSessions(
-      rejectPendingDrawAction({
+    runDrawMutationOnce(`agree:${currentDrawSessionId}`, () => {
+      const result = agreeToPendingDrawAction({
         drawSessions,
         pairId: activePairId,
         drawSessionId: currentDrawSessionId,
         targetWeekStart: selectedTargetWeek,
         actingMemberId: activeMemberId,
-      }),
-    );
-    setDrawNotice(null);
+        requiredMemberIds: pairedAgreementMemberIds,
+      });
+
+      if (result.completedAction === 'accept' && currentDrawResult) {
+        finalizeAcceptedDraw(currentDrawResult, result.drawSessions);
+        return;
+      }
+
+      if (result.completedAction === 'reroll' || result.completedAction === 'change') {
+        const replacement = drawReplacementResult(
+          currentDrawSession?.result_activity_id ?? null,
+        );
+        setDrawSessions(
+          replacement
+            ? applyDrawReplacementResult({
+                drawSessions: result.drawSessions,
+                pairId: activePairId,
+                drawSessionId: currentDrawSessionId,
+                targetWeekStart: selectedTargetWeek,
+                actingMemberId: activeMemberId,
+                resultActivityId: replacement.id,
+              })
+            : result.drawSessions,
+        );
+        return;
+      }
+
+      setDrawSessions(result.drawSessions);
+    });
   }
 
-  function finalizeAcceptedDraw(activity: Activity) {
-    const session = createScheduledSession(
-      activity,
-      currentDrawSessionId,
-      activePairId,
-      selectedTargetWeek,
-      currentWeekStart,
-    );
+  function rejectPendingDraw() {
+    runDrawMutationOnce(`reject:${currentDrawSessionId}`, () => {
+      setDrawSessions(
+        rejectPendingDrawAction({
+          drawSessions,
+          pairId: activePairId,
+          drawSessionId: currentDrawSessionId,
+          targetWeekStart: selectedTargetWeek,
+          actingMemberId: activeMemberId,
+        }),
+      );
+      setDrawNotice(null);
+    });
+  }
 
-    setScheduledSessions((sessions) => [...sessions, session]);
+  function finalizeAcceptedDraw(activity: Activity, nextDrawSessions?: DrawSession[]) {
+    setScheduledSessions(
+      (sessions) =>
+        upsertAcceptedDrawScheduledSession({
+          activity,
+          currentWeekStart,
+          drawSessionId: currentDrawSessionId,
+          pairId: activePairId,
+          scheduledSessions: sessions,
+          targetWeekStartDate: selectedTargetWeek,
+        }).scheduledSessions,
+    );
     setDrawSessions((sessions) =>
       upsertDrawSessionState({
-        drawSessions: sessions,
+        drawSessions: nextDrawSessions ?? sessions,
         pairId: activePairId,
         drawSessionId: currentDrawSessionId,
         targetWeekStart: selectedTargetWeek,
@@ -758,6 +853,20 @@ function App() {
       }),
     );
     setDrawNotice(null);
+  }
+
+  function runDrawMutationOnce(key: string, mutation: () => void) {
+    if (pendingDrawMutationKeyRef.current === key) {
+      return;
+    }
+
+    pendingDrawMutationKeyRef.current = key;
+    mutation();
+    window.setTimeout(() => {
+      if (pendingDrawMutationKeyRef.current === key) {
+        pendingDrawMutationKeyRef.current = null;
+      }
+    }, 450);
   }
 
   function drawReplacementResult(currentActivityId: string | null) {
@@ -887,6 +996,18 @@ function App() {
       onNavigate={setActiveScreen}
       pair={activePair}
     >
+      {updateAvailable && (
+        <div className="mb-4 rounded-md bg-mint/35 p-3 shadow-sm">
+          <p className="text-sm font-black text-ink">{UPDATE_NOTICE}</p>
+          <button
+            className="mt-2 h-10 rounded-md bg-ink px-4 text-sm font-bold text-cream"
+            type="button"
+            onClick={refreshToNewVersion}
+          >
+            {UPDATE_BUTTON_LABEL}
+          </button>
+        </div>
+      )}
       {(!repository.hasRemoteEnv || !pairIdentity) && (
         <div className="mb-4 rounded-md bg-butter/45 p-3 shadow-sm">
           <p className="text-sm font-black text-ink">

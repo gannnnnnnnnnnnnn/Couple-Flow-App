@@ -8,6 +8,7 @@ import {
   getFollowUpTargetWeek,
   isActivityReferenced,
   isHistoryEligible,
+  upsertAcceptedDrawScheduledSession,
 } from './state';
 
 const activity: Activity = {
@@ -36,6 +37,80 @@ describe('state transitions', () => {
     expect(session.target_week_start_date).toBe('2026-07-06');
     expect(session.status).toBe('planning');
     expect(isHistoryEligible(session, [])).toBe(false);
+  });
+
+  it('accept agreement creates a scheduled session exactly once', () => {
+    const first = upsertAcceptedDrawScheduledSession({
+      activity,
+      currentWeekStart: '2026-06-29',
+      drawSessionId: 'draw-1',
+      pairId: 'pair',
+      scheduledSessions: [],
+      targetWeekStartDate: '2026-07-06',
+      now: new Date('2026-07-01T00:00:00.000Z'),
+    });
+    const second = upsertAcceptedDrawScheduledSession({
+      activity,
+      currentWeekStart: '2026-06-29',
+      drawSessionId: 'draw-1',
+      pairId: 'pair',
+      scheduledSessions: first.scheduledSessions,
+      targetWeekStartDate: '2026-07-06',
+      now: new Date('2026-07-01T00:00:01.000Z'),
+    });
+
+    expect(first.scheduledSessions).toHaveLength(1);
+    expect(second.scheduledSessions).toHaveLength(1);
+    expect(second.session.id).toBe(first.session.id);
+  });
+
+  it('reuses an existing scheduled session for the same accepted draw result', () => {
+    const existing = createScheduledSession(
+      activity,
+      'draw-1',
+      'pair',
+      '2026-07-06',
+      '2026-06-29',
+      new Date('2026-07-01T00:00:00.000Z'),
+    );
+    const result = upsertAcceptedDrawScheduledSession({
+      activity,
+      currentWeekStart: '2026-06-29',
+      drawSessionId: 'draw-1',
+      pairId: 'pair',
+      scheduledSessions: [existing],
+      targetWeekStartDate: '2026-07-06',
+      now: new Date('2026-07-01T00:00:01.000Z'),
+    });
+
+    expect(result.session).toEqual(existing);
+    expect(result.scheduledSessions).toEqual([existing]);
+  });
+
+  it('deduplicates repeated scheduled sessions for one accepted draw result', () => {
+    const first = createScheduledSession(
+      activity,
+      'draw-1',
+      'pair',
+      '2026-07-06',
+      '2026-06-29',
+      new Date('2026-07-01T00:00:00.000Z'),
+    );
+    const duplicate = {
+      ...first,
+      id: 'session-duplicate',
+      created_at: '2026-07-01T00:00:01.000Z',
+    };
+    const result = upsertAcceptedDrawScheduledSession({
+      activity,
+      currentWeekStart: '2026-06-29',
+      drawSessionId: 'draw-1',
+      pairId: 'pair',
+      scheduledSessions: [first, duplicate],
+      targetWeekStartDate: '2026-07-06',
+    });
+
+    expect(result.scheduledSessions).toEqual([first]);
   });
 
   it('outcome makes a scheduled session history eligible', () => {

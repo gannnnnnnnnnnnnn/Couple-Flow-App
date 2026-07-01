@@ -26,6 +26,7 @@
 - [x] Vercel deployment docs cover Vite preset, build command, output directory, env vars, and phone install.
 - [x] Phone usage docs cover same-URL pairing, no shared Wi-Fi requirement, network expectations, and add-to-home-screen.
 - [x] Vercel SPA refreshes route back to the app shell.
+- [x] App update recovery shows Chinese refresh copy and does not clear pair identity or local data.
 - [x] Settings distinguishes local-only, sync-available, connected, syncing, last-saved, and sync-error states.
 - [x] App has a top-level Chinese error boundary with reload and owned-storage repair actions.
 - [x] App repair and Settings local-device clear remove only Couple Flow-owned `couple-flow.` storage keys.
@@ -42,6 +43,7 @@
 - [x] Paired Draw renders 我的屏蔽 as editable and 对方的屏蔽 as read-only.
 - [x] Draw realtime applies shared changes without navigating, resetting the visible result, or jumping week/budget controls.
 - [x] Paired Draw accept, 重抽, and 换一个 requests require both members before creating a todo or replacing the current result.
+- [x] Paired Draw agreement actions disable immediately after tap and clear pending UI state after accept, rejection, reroll, or change completion.
 - [x] JSON backup export/import exists for local mode with shape validation.
 - [x] No photos, maps, payments, or push notifications.
 
@@ -64,6 +66,8 @@
 - [x] Removed own weekly bans delete only the matching pair/draw/member/activity row and stay deleted after reload.
 - [x] Activity delete sync deletes unreferenced activities remotely and pauses referenced activities instead.
 - [x] Draw sessions carry a per-target-week `idle` / `drawing` / `revealed` / `pending_accept` / `accepted` / `pending_reroll` / `pending_change` guard.
+- [x] Accepted draw-created scheduled sessions are idempotent by pair, draw session, activity, and target week.
+- [x] Supabase schema guards draw-created scheduled-session duplicates with a migration-safe partial unique index.
 - [x] Autosave is debounced and skips immediate saves after identical remote snapshots are applied.
 - [x] `.env.example` contains placeholders only.
 - [x] `.gitignore` excludes `.env`, `.env.local`, and `.env.*.local`.

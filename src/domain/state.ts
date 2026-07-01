@@ -46,21 +46,110 @@ export function createScheduledSession(
   pairId: string,
   targetWeekStartDate: string,
   currentWeekStart: string,
+  now = new Date(),
 ): ScheduledSession {
   return {
-    id: `session-${activity.id}-${Date.now()}`,
+    id: `session-${activity.id}-${now.getTime()}`,
     pair_id: pairId,
     activity_id: activity.id,
     draw_session_id: drawSessionId,
     target_week_start_date: targetWeekStartDate,
-    status:
-      targetWeekStartDate < currentWeekStart
-        ? 'needs_review'
-        : targetWeekStartDate === currentWeekStart
-          ? 'ongoing'
-          : 'planning',
+    status: getScheduledSessionStatus(targetWeekStartDate, currentWeekStart),
     todo_text: '一起挑个时间',
-    created_at: new Date().toISOString(),
+    created_at: now.toISOString(),
+  };
+}
+
+export function getScheduledSessionStatus(
+  targetWeekStartDate: string,
+  currentWeekStart: string,
+): ScheduledSession['status'] {
+  return targetWeekStartDate < currentWeekStart
+    ? 'needs_review'
+    : targetWeekStartDate === currentWeekStart
+      ? 'ongoing'
+      : 'planning';
+}
+
+export function findScheduledSessionForDrawResult({
+  scheduledSessions,
+  pairId,
+  drawSessionId,
+  activityId,
+  targetWeekStartDate,
+}: {
+  scheduledSessions: ScheduledSession[];
+  pairId: string;
+  drawSessionId: string;
+  activityId: string;
+  targetWeekStartDate: string;
+}) {
+  return scheduledSessions.find(
+    (session) =>
+      session.pair_id === pairId &&
+      session.draw_session_id === drawSessionId &&
+      session.activity_id === activityId &&
+      session.target_week_start_date === targetWeekStartDate,
+  );
+}
+
+export function upsertAcceptedDrawScheduledSession({
+  activity,
+  currentWeekStart,
+  drawSessionId,
+  pairId,
+  scheduledSessions,
+  targetWeekStartDate,
+  now = new Date(),
+}: {
+  activity: Activity;
+  currentWeekStart: string;
+  drawSessionId: string;
+  pairId: string;
+  scheduledSessions: ScheduledSession[];
+  targetWeekStartDate: string;
+  now?: Date;
+}): { scheduledSessions: ScheduledSession[]; session: ScheduledSession } {
+  const existing = findScheduledSessionForDrawResult({
+    scheduledSessions,
+    pairId,
+    drawSessionId,
+    activityId: activity.id,
+    targetWeekStartDate,
+  });
+  const session =
+    existing ??
+    createScheduledSession(
+      activity,
+      drawSessionId,
+      pairId,
+      targetWeekStartDate,
+      currentWeekStart,
+      now,
+    );
+  let seenResult = false;
+  const dedupedSessions = scheduledSessions.filter((candidate) => {
+    const sameAcceptedDrawResult =
+      candidate.pair_id === pairId &&
+      candidate.draw_session_id === drawSessionId &&
+      candidate.activity_id === activity.id &&
+      candidate.target_week_start_date === targetWeekStartDate;
+
+    if (!sameAcceptedDrawResult) {
+      return true;
+    }
+
+    if (candidate.id === session.id || !seenResult) {
+      seenResult = true;
+      return candidate.id === session.id;
+    }
+
+    return false;
+  });
+
+  return {
+    session,
+    scheduledSessions: existing ? dedupedSessions : [...dedupedSessions, session],
   };
 }
 
