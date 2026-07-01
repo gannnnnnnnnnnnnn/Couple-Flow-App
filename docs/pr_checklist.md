@@ -15,6 +15,7 @@
 - [x] Week Board exists.
 - [x] Activity Pool exists.
 - [x] Draw Flow exists.
+- [x] Draw Flow reveals exactly one persisted result and no longer asks the user to choose from three cards.
 - [x] History exists.
 - [x] Settings / Pair exists.
 - [x] Normal user-facing app screens use Simplified Chinese copy.
@@ -39,7 +40,8 @@
 - [x] Activity Pool supports editing, safe deletion, and pause fallback for referenced activities.
 - [x] Paired Draw locks the acting member to the stored device identity.
 - [x] Paired Draw renders 我的屏蔽 as editable and 对方的屏蔽 as read-only.
-- [x] Draw realtime applies shared changes without navigating, resetting draw results, or jumping week/budget controls.
+- [x] Draw realtime applies shared changes without navigating, resetting the visible result, or jumping week/budget controls.
+- [x] Paired Draw accept, 重抽, and 换一个 requests require both members before creating a todo or replacing the current result.
 - [x] JSON backup export/import exists for local mode with shape validation.
 - [x] No photos, maps, payments, or push notifications.
 
@@ -61,7 +63,7 @@
 - [x] Explicit shared clear deletes pair-scoped Supabase activities, plans, bans, draw sessions, and outcomes.
 - [x] Removed own weekly bans delete only the matching pair/draw/member/activity row and stay deleted after reload.
 - [x] Activity delete sync deletes unreferenced activities remotely and pauses referenced activities instead.
-- [x] Draw sessions carry a per-target-week `idle` / `drawing` / `revealed` / `accepted` guard.
+- [x] Draw sessions carry a per-target-week `idle` / `drawing` / `revealed` / `pending_accept` / `accepted` / `pending_reroll` / `pending_change` guard.
 - [x] Autosave is debounced and skips immediate saves after identical remote snapshots are applied.
 - [x] `.env.example` contains placeholders only.
 - [x] `.gitignore` excludes `.env`, `.env.local`, and `.env.*.local`.

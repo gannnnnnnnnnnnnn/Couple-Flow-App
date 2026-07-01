@@ -1,7 +1,6 @@
 import type {
-  Activity,
-  BudgetFilter,
   DrawSession,
+  PendingDrawAction,
   PairMember,
   WeeklyActivityBan,
 } from '../types';
@@ -29,6 +28,23 @@ export interface ToggleWeeklyBanResult {
       }
     | null;
 }
+
+export type AgreementCompletion = PendingDrawAction | null;
+
+export const PENDING_DRAW_STATUS_BY_ACTION: Record<
+  PendingDrawAction,
+  DrawSession['status']
+> = {
+  accept: 'pending_accept',
+  reroll: 'pending_reroll',
+  change: 'pending_change',
+};
+
+const pendingDrawStatuses = new Set<DrawSession['status']>([
+  'pending_accept',
+  'pending_reroll',
+  'pending_change',
+]);
 
 export function getActingMemberId(
   pairIdentity: PairIdentity | null,
@@ -126,6 +142,10 @@ export function upsertDrawSessionState({
   targetWeekStart,
   actingMemberId,
   status,
+  resultActivityId,
+  pendingActionType,
+  requestedByMemberId,
+  agreedByMemberIds,
   now = new Date(),
 }: {
   drawSessions: DrawSession[];
@@ -134,6 +154,10 @@ export function upsertDrawSessionState({
   targetWeekStart: string;
   actingMemberId: string;
   status: DrawSession['status'];
+  resultActivityId?: string | null;
+  pendingActionType?: PendingDrawAction | null;
+  requestedByMemberId?: string | null;
+  agreedByMemberIds?: string[];
   now?: Date;
 }) {
   const existing = drawSessions.find(
@@ -148,6 +172,20 @@ export function upsertDrawSessionState({
     target_week_start_date: targetWeekStart,
     created_by_member_id: existing?.created_by_member_id ?? actingMemberId,
     status,
+    result_activity_id:
+      resultActivityId === undefined ? existing?.result_activity_id ?? null : resultActivityId,
+    pending_action_type:
+      pendingActionType === undefined
+        ? existing?.pending_action_type ?? null
+        : pendingActionType,
+    requested_by_member_id:
+      requestedByMemberId === undefined
+        ? existing?.requested_by_member_id ?? null
+        : requestedByMemberId,
+    agreed_by_member_ids:
+      agreedByMemberIds === undefined
+        ? existing?.agreed_by_member_ids ?? []
+        : uniqueMemberIds(agreedByMemberIds),
     created_at: existing?.created_at ?? now.toISOString(),
   };
 
@@ -167,22 +205,148 @@ export function isPartnerDrawActive(
   return (
     !!drawSession &&
     drawSession.created_by_member_id !== actingMemberId &&
-    (drawSession.status === 'drawing' || drawSession.status === 'revealed')
+    drawSession.status === 'drawing'
   );
+}
+
+export function hasPendingDrawAction(drawSession: DrawSession | undefined) {
+  return !!drawSession && pendingDrawStatuses.has(drawSession.status);
+}
+
+export function canRequestDrawAction(drawSession: DrawSession | undefined) {
+  return (
+    !!drawSession &&
+    drawSession.status === 'revealed' &&
+    !!drawSession.result_activity_id &&
+    !drawSession.pending_action_type
+  );
+}
+
+export function requestDrawAgreement({
+  drawSessions,
+  pairId,
+  drawSessionId,
+  targetWeekStart,
+  actingMemberId,
+  actionType,
+}: {
+  drawSessions: DrawSession[];
+  pairId: string;
+  drawSessionId: string;
+  targetWeekStart: string;
+  actingMemberId: string;
+  actionType: PendingDrawAction;
+}) {
+  const existing = getDrawSessionForWeek(drawSessions, targetWeekStart);
+  const resultActivityId = existing?.result_activity_id ?? null;
+  if (!canRequestDrawAction(existing) || !resultActivityId) {
+    return drawSessions;
+  }
+
+  return upsertDrawSessionState({
+    drawSessions,
+    pairId,
+    drawSessionId,
+    targetWeekStart,
+    actingMemberId,
+    status: PENDING_DRAW_STATUS_BY_ACTION[actionType],
+    resultActivityId,
+    pendingActionType: actionType,
+    requestedByMemberId: actingMemberId,
+    agreedByMemberIds: [actingMemberId],
+  });
+}
+
+export function agreeToPendingDrawAction({
+  drawSessions,
+  pairId,
+  drawSessionId,
+  targetWeekStart,
+  actingMemberId,
+  requiredMemberIds,
+}: {
+  drawSessions: DrawSession[];
+  pairId: string;
+  drawSessionId: string;
+  targetWeekStart: string;
+  actingMemberId: string;
+  requiredMemberIds: string[];
+}): { drawSessions: DrawSession[]; completedAction: AgreementCompletion } {
+  const existing = getDrawSessionForWeek(drawSessions, targetWeekStart);
+  if (!existing?.pending_action_type || !hasPendingDrawAction(existing)) {
+    return { drawSessions, completedAction: null };
+  }
+
+  const agreedByMemberIds = uniqueMemberIds([
+    ...existing.agreed_by_member_ids,
+    actingMemberId,
+  ]);
+  const requiredIds = uniqueMemberIds(requiredMemberIds);
+  const agreementComplete =
+    requiredIds.length > 0 && requiredIds.every((memberId) => agreedByMemberIds.includes(memberId));
+  const completedAction = agreementComplete ? existing.pending_action_type : null;
+
+  return {
+    completedAction,
+    drawSessions: upsertDrawSessionState({
+      drawSessions,
+      pairId,
+      drawSessionId,
+      targetWeekStart,
+      actingMemberId,
+      status: agreementComplete ? 'revealed' : existing.status,
+      resultActivityId: existing.result_activity_id,
+      pendingActionType: agreementComplete ? null : existing.pending_action_type,
+      requestedByMemberId: agreementComplete ? null : existing.requested_by_member_id,
+      agreedByMemberIds: agreementComplete ? [] : agreedByMemberIds,
+    }),
+  };
+}
+
+export function rejectPendingDrawAction({
+  drawSessions,
+  pairId,
+  drawSessionId,
+  targetWeekStart,
+  actingMemberId,
+}: {
+  drawSessions: DrawSession[];
+  pairId: string;
+  drawSessionId: string;
+  targetWeekStart: string;
+  actingMemberId: string;
+}) {
+  const existing = getDrawSessionForWeek(drawSessions, targetWeekStart);
+  if (!hasPendingDrawAction(existing)) {
+    return drawSessions;
+  }
+
+  return upsertDrawSessionState({
+    drawSessions,
+    pairId,
+    drawSessionId,
+    targetWeekStart,
+    actingMemberId,
+    status: 'revealed',
+    resultActivityId: existing?.result_activity_id ?? null,
+    pendingActionType: null,
+    requestedByMemberId: null,
+    agreedByMemberIds: [],
+  });
 }
 
 export function shouldShowDrawStaleNotice({
   localBans,
   remoteBans,
   drawSessionId,
-  drawResults,
+  resultActivityId,
 }: {
   localBans: WeeklyActivityBan[];
   remoteBans: WeeklyActivityBan[];
   drawSessionId: string;
-  drawResults: Activity[];
+  resultActivityId: string | null;
 }) {
-  if (!drawResults.length) {
+  if (!resultActivityId) {
     return false;
   }
 
@@ -190,6 +354,10 @@ export function shouldShowDrawStaleNotice({
     fingerprintBansForDraw(localBans, drawSessionId) !==
     fingerprintBansForDraw(remoteBans, drawSessionId)
   );
+}
+
+function uniqueMemberIds(memberIds: string[]) {
+  return Array.from(new Set(memberIds.filter(Boolean)));
 }
 
 function fingerprintBansForDraw(bans: WeeklyActivityBan[], drawSessionId: string) {

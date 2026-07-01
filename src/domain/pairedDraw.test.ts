@@ -1,10 +1,13 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity, DrawSession, PairMember, WeeklyActivityBan } from '../types';
 import {
+  agreeToPendingDrawAction,
   getActingMemberId,
   getDrawSessionId,
   isPartnerDrawActive,
   mergeRemoteBansForPairedDevice,
+  rejectPendingDrawAction,
+  requestDrawAgreement,
   shouldShowDrawStaleNotice,
   toggleWeeklyActivityBan,
   upsertDrawSessionState,
@@ -47,6 +50,22 @@ function ban(overrides: Partial<WeeklyActivityBan> = {}): WeeklyActivityBan {
     draw_session_id: 'draw-pair-1-2026-07-06',
     member_id: 'member-me',
     activity_id: 'activity-1',
+    created_at: '',
+    ...overrides,
+  };
+}
+
+function drawSession(overrides: Partial<DrawSession> = {}): DrawSession {
+  return {
+    id: 'draw-pair-1-2026-07-06',
+    pair_id: 'pair-1',
+    target_week_start_date: '2026-07-06',
+    created_by_member_id: 'member-me',
+    status: 'revealed',
+    result_activity_id: 'activity-1',
+    pending_action_type: null,
+    requested_by_member_id: null,
+    agreed_by_member_ids: [],
     created_at: '',
     ...overrides,
   };
@@ -149,23 +168,20 @@ describe('paired draw helpers', () => {
         localBans: [ban({ activity_id: 'activity-1' })],
         remoteBans: [ban({ activity_id: 'activity-2' })],
         drawSessionId: 'draw-pair-1-2026-07-06',
-        drawResults: [activity],
+        resultActivityId: activity.id,
       }),
     ).toBe(true);
   });
 
   it('guards a target week when the partner is drawing or revealed', () => {
-    const drawSession: DrawSession = {
-      id: 'draw-pair-1-2026-07-06',
-      pair_id: 'pair-1',
-      target_week_start_date: '2026-07-06',
+    const activeDrawSession = drawSession({
       created_by_member_id: 'member-partner',
-      status: 'revealed',
-      created_at: '',
-    };
+      status: 'drawing',
+    });
 
-    expect(isPartnerDrawActive(drawSession, 'member-me')).toBe(true);
-    expect(isPartnerDrawActive({ ...drawSession, status: 'accepted' }, 'member-me')).toBe(false);
+    expect(isPartnerDrawActive(activeDrawSession, 'member-me')).toBe(true);
+    expect(isPartnerDrawActive({ ...activeDrawSession, status: 'revealed' }, 'member-me')).toBe(false);
+    expect(isPartnerDrawActive({ ...activeDrawSession, status: 'accepted' }, 'member-me')).toBe(false);
   });
 
   it('upserts draw state for the target week', () => {
@@ -184,6 +200,7 @@ describe('paired draw helpers', () => {
       expect.objectContaining({
         id: drawSessionId,
         status: 'drawing',
+        result_activity_id: null,
         created_by_member_id: 'member-me',
       }),
     ]);
@@ -195,19 +212,18 @@ describe('paired draw helpers', () => {
         targetWeekStart: '2026-07-06',
         actingMemberId: 'member-me',
         status: 'revealed',
+        resultActivityId: activity.id,
       })[0].status,
     ).toBe('revealed');
   });
 
   it('updates an existing same-week draw session with a different id', () => {
-    const existing: DrawSession = {
+    const existing = drawSession({
       id: 'draw-seed',
-      pair_id: 'pair-1',
-      target_week_start_date: '2026-07-06',
       created_by_member_id: 'member-partner',
       status: 'idle',
       created_at: '2026-06-29T00:00:00.000Z',
-    };
+    });
 
     const updated = upsertDrawSessionState({
       drawSessions: [existing],
@@ -224,5 +240,118 @@ describe('paired draw helpers', () => {
         status: 'drawing',
       },
     ]);
+  });
+
+  it('creates a pending reroll request without changing the current result', () => {
+    const requested = requestDrawAgreement({
+      drawSessions: [drawSession()],
+      pairId: 'pair-1',
+      drawSessionId: 'draw-pair-1-2026-07-06',
+      targetWeekStart: '2026-07-06',
+      actingMemberId: 'member-me',
+      actionType: 'reroll',
+    });
+
+    expect(requested[0]).toEqual(
+      expect.objectContaining({
+        status: 'pending_reroll',
+        result_activity_id: 'activity-1',
+        pending_action_type: 'reroll',
+        requested_by_member_id: 'member-me',
+        agreed_by_member_ids: ['member-me'],
+      }),
+    );
+  });
+
+  it('completes a pending reroll only after the second member agrees', () => {
+    const requested = drawSession({
+      status: 'pending_reroll',
+      pending_action_type: 'reroll',
+      requested_by_member_id: 'member-me',
+      agreed_by_member_ids: ['member-me'],
+    });
+
+    const firstAgreement = agreeToPendingDrawAction({
+      drawSessions: [requested],
+      pairId: 'pair-1',
+      drawSessionId: requested.id,
+      targetWeekStart: requested.target_week_start_date,
+      actingMemberId: 'member-me',
+      requiredMemberIds: ['member-me', 'member-partner'],
+    });
+    expect(firstAgreement.completedAction).toBeNull();
+
+    const secondAgreement = agreeToPendingDrawAction({
+      drawSessions: firstAgreement.drawSessions,
+      pairId: 'pair-1',
+      drawSessionId: requested.id,
+      targetWeekStart: requested.target_week_start_date,
+      actingMemberId: 'member-partner',
+      requiredMemberIds: ['member-me', 'member-partner'],
+    });
+
+    expect(secondAgreement.completedAction).toBe('reroll');
+    expect(secondAgreement.drawSessions[0]).toEqual(
+      expect.objectContaining({
+        status: 'revealed',
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      }),
+    );
+  });
+
+  it('rejects a pending request and keeps the current result', () => {
+    const pending = drawSession({
+      status: 'pending_change',
+      pending_action_type: 'change',
+      requested_by_member_id: 'member-me',
+      agreed_by_member_ids: ['member-me'],
+    });
+
+    expect(
+      rejectPendingDrawAction({
+        drawSessions: [pending],
+        pairId: 'pair-1',
+        drawSessionId: pending.id,
+        targetWeekStart: pending.target_week_start_date,
+        actingMemberId: 'member-partner',
+      })[0],
+    ).toEqual(
+      expect.objectContaining({
+        status: 'revealed',
+        result_activity_id: 'activity-1',
+        pending_action_type: null,
+      }),
+    );
+  });
+
+  it('requires both members for paired accept agreement', () => {
+    const requested = requestDrawAgreement({
+      drawSessions: [drawSession()],
+      pairId: 'pair-1',
+      drawSessionId: 'draw-pair-1-2026-07-06',
+      targetWeekStart: '2026-07-06',
+      actingMemberId: 'member-me',
+      actionType: 'accept',
+    });
+    expect(requested[0]).toEqual(
+      expect.objectContaining({
+        status: 'pending_accept',
+        pending_action_type: 'accept',
+        agreed_by_member_ids: ['member-me'],
+      }),
+    );
+
+    const agreed = agreeToPendingDrawAction({
+      drawSessions: requested,
+      pairId: 'pair-1',
+      drawSessionId: 'draw-pair-1-2026-07-06',
+      targetWeekStart: '2026-07-06',
+      actingMemberId: 'member-partner',
+      requiredMemberIds: ['member-me', 'member-partner'],
+    });
+
+    expect(agreed.completedAction).toBe('accept');
   });
 });

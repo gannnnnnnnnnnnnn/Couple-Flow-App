@@ -94,10 +94,9 @@ function mergeDrawSessionsForRealtime(
   const merged = new Map(remoteDrawSessions.map((drawSession) => [drawSession.id, drawSession]));
 
   localDrawSessions.forEach((drawSession) => {
-    const remoteDrawSession = merged.get(drawSession.id);
     if (
       drawSession.created_by_member_id === actingMemberId &&
-      (!remoteDrawSession || remoteDrawSession.created_by_member_id === actingMemberId)
+      !merged.has(drawSession.id)
     ) {
       merged.set(drawSession.id, drawSession);
     }

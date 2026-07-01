@@ -1,12 +1,13 @@
 import { Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import { drawActivities, getEligibleActivities } from '../domain/draw';
+import { drawOneActivity, getEligibleActivities } from '../domain/draw';
 import { formatWeekLabel } from '../domain/week';
 import type {
   Activity,
   BudgetFilter,
   BudgetGroup,
   DrawSession,
+  PendingDrawAction,
   PairMember,
   ScheduledSession,
   SessionOutcome,
@@ -27,18 +28,22 @@ export function DrawScreen({
   targetWeekStart,
   drawSessionId,
   budgetFilter,
-  drawResults,
+  drawResult,
   currentMemberId,
   currentDrawSession,
   drawNotice,
   pairedMode,
   partnerDrawActive,
+  requiresPairedAgreement,
   onTargetWeekChange,
   onBudgetChange,
   onToggleBan,
   onStartDraw,
   onDraw,
   onAccept,
+  onRequestAction,
+  onAgreePending,
+  onRejectPending,
 }: {
   activities: Activity[];
   budgetGroups: BudgetGroup[];
@@ -52,18 +57,22 @@ export function DrawScreen({
   targetWeekStart: string;
   drawSessionId: string;
   budgetFilter: BudgetFilter;
-  drawResults: Activity[];
+  drawResult: Activity | null;
   currentMemberId: string;
   currentDrawSession: DrawSession | undefined;
   drawNotice: string | null;
   pairedMode: boolean;
   partnerDrawActive: boolean;
+  requiresPairedAgreement: boolean;
   onTargetWeekChange: (weekStart: string) => void;
   onBudgetChange: (budget: BudgetFilter) => void;
   onToggleBan: (memberId: string, activityId: string) => void;
   onStartDraw: () => boolean;
-  onDraw: (results: Activity[]) => void;
+  onDraw: (result: Activity | null) => void;
   onAccept: (activity: Activity) => void;
+  onRequestAction: (actionType: PendingDrawAction) => void;
+  onAgreePending: () => void;
+  onRejectPending: () => void;
 }) {
   const [revealing, setRevealing] = useState(false);
   const bannableActivities = activities.filter(
@@ -87,12 +96,35 @@ export function DrawScreen({
     }
 
     setRevealing(true);
-    const results = drawActivities(eligibleActivities, 3, Date.now());
+    const result = drawOneActivity(eligibleActivities, Date.now());
     window.setTimeout(() => {
-      onDraw(results);
+      onDraw(result);
       setRevealing(false);
     }, 520);
   }
+
+  const pendingAction = currentDrawSession?.pending_action_type ?? null;
+  const pendingRequestedByMe =
+    !!pendingAction && currentDrawSession?.requested_by_member_id === currentMemberId;
+  const hasAgreed =
+    !!pendingAction && currentDrawSession?.agreed_by_member_ids.includes(currentMemberId);
+  const pendingText =
+    pendingAction === 'reroll'
+      ? '重抽'
+      : pendingAction === 'change'
+        ? '换一个'
+        : '接受';
+  const partnerPendingText =
+    pendingAction === 'reroll'
+      ? '对方想重抽'
+      : pendingAction === 'change'
+        ? '对方想换一个'
+        : '对方想接受';
+  const canActOnResult =
+    !!drawResult &&
+    currentDrawSession?.status === 'revealed' &&
+    !partnerDrawActive &&
+    !revealing;
 
   return (
     <section className="space-y-5">
@@ -211,16 +243,17 @@ export function DrawScreen({
             !eligibleActivities.length ||
             revealing ||
             partnerDrawActive ||
-            currentDrawSession?.status === 'accepted'
+            currentDrawSession?.status === 'accepted' ||
+            currentDrawSession?.status.startsWith('pending_')
           }
           onClick={runDraw}
         >
-          {revealing ? '揭晓中...' : '抽 1-3 个计划'}
+          {revealing ? '揭晓中...' : '开抽'}
         </button>
       </div>
 
       <div>
-        <SectionTitle title="揭晓区" count={drawResults.length} />
+        <SectionTitle title="揭晓区" count={drawResult ? 1 : 0} />
         <div className={`mt-3 space-y-3 ${revealing ? 'animate-draw-shuffle' : ''}`}>
           {revealing && (
             <article className="rounded-md bg-ink p-4 text-cream shadow-soft">
@@ -233,34 +266,85 @@ export function DrawScreen({
               <div className="mt-2 h-4 w-2/3 rounded-md bg-cream/14" />
             </article>
           )}
-          {!revealing && drawResults.length === 0 && (
+          {!revealing && !drawResult && (
             <EmptyState
               title="还没揭晓"
-              body="先选屏蔽项，再点抽签。收下的卡会变成本周计划，不会直接进记录。"
+              body="先选屏蔽项，再点开抽。收下的卡会变成本周计划，不会直接进记录。"
             />
           )}
-          {drawResults.map((activity, index) => (
+          {drawResult && (
             <article
-              key={activity.id}
+              key={drawResult.id}
               className="animate-draw-reveal rounded-md bg-ink p-4 text-cream shadow-soft"
-              style={{ transform: `rotate(${(index - 1) * 1.2}deg)` }}
             >
               <div className="mb-4 flex items-center justify-between">
                 <Sparkles size={22} />
-                <Chip tone="light">{budgetById.get(activity.budget_group_id)?.name ?? '随意'}</Chip>
+                <Chip tone="light">{budgetById.get(drawResult.budget_group_id)?.name ?? '随意'}</Chip>
               </div>
-              <h3 className="text-2xl font-black leading-tight">{activity.title}</h3>
-              <p className="mt-2 text-sm text-cream/75">{activity.note}</p>
-              <button
-                className="mt-5 h-11 w-full rounded-md bg-cream px-4 font-bold text-ink disabled:opacity-45"
-                type="button"
-                disabled={partnerDrawActive}
-                onClick={() => onAccept(activity)}
-              >
-                就它了
-              </button>
+              <h3 className="text-2xl font-black leading-tight">{drawResult.title}</h3>
+              <p className="mt-2 text-sm text-cream/75">{drawResult.note}</p>
+              {pendingAction ? (
+                <div className="mt-5 space-y-3">
+                  <p className="rounded-md bg-cream/15 px-3 py-2 text-sm font-bold text-cream/82">
+                    {pendingRequestedByMe || hasAgreed
+                      ? `等待对方同意${pendingText}`
+                      : partnerPendingText}
+                  </p>
+                  {!pendingRequestedByMe && !hasAgreed && (
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        className="h-11 rounded-md bg-cream px-4 font-bold text-ink"
+                        type="button"
+                        onClick={onAgreePending}
+                      >
+                        同意
+                      </button>
+                      <button
+                        className="h-11 rounded-md bg-white/15 px-4 font-bold text-cream"
+                        type="button"
+                        onClick={onRejectPending}
+                      >
+                        不同意
+                      </button>
+                    </div>
+                  )}
+                </div>
+              ) : currentDrawSession?.status === 'accepted' ? (
+                <p className="mt-5 rounded-md bg-cream/15 px-3 py-2 text-sm font-bold text-cream/82">
+                  已收进待办，完成后再进历史。
+                </p>
+              ) : (
+                <div className="mt-5 grid gap-2">
+                  <button
+                    className="h-11 w-full rounded-md bg-cream px-4 font-bold text-ink disabled:opacity-45"
+                    type="button"
+                    disabled={!canActOnResult}
+                    onClick={() => onAccept(drawResult)}
+                  >
+                    接受
+                  </button>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      className="h-11 rounded-md bg-white/15 px-4 font-bold text-cream disabled:opacity-45"
+                      type="button"
+                      disabled={!canActOnResult}
+                      onClick={() => onRequestAction('reroll')}
+                    >
+                      重抽
+                    </button>
+                    <button
+                      className="h-11 rounded-md bg-white/15 px-4 font-bold text-cream disabled:opacity-45"
+                      type="button"
+                      disabled={!canActOnResult}
+                      onClick={() => onRequestAction('change')}
+                    >
+                      换一个
+                    </button>
+                  </div>
+                </div>
+              )}
             </article>
-          ))}
+          )}
         </div>
       </div>
     </section>

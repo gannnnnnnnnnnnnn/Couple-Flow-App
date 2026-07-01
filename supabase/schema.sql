@@ -42,7 +42,21 @@ create table if not exists draw_sessions (
   pair_id text not null references pairs(id) on delete cascade,
   target_week_start_date date not null,
   created_by_member_id text not null references pair_members(id) on delete restrict,
-  status text not null check (status in ('idle', 'drawing', 'revealed', 'accepted')),
+  status text not null check (
+    status in (
+      'idle',
+      'drawing',
+      'revealed',
+      'pending_accept',
+      'accepted',
+      'pending_reroll',
+      'pending_change'
+    )
+  ),
+  result_activity_id text references activities(id) on delete set null,
+  pending_action_type text check (pending_action_type in ('accept', 'reroll', 'change')),
+  requested_by_member_id text references pair_members(id) on delete set null,
+  agreed_by_member_ids text[] not null default '{}',
   created_at timestamptz not null default now()
 );
 
@@ -52,9 +66,41 @@ create table if not exists draw_sessions (
 -- adding the stricter state check and unique pair/week index.
 alter table draw_sessions drop constraint if exists draw_sessions_status_check;
 
+alter table draw_sessions
+  add column if not exists result_activity_id text references activities(id) on delete set null;
+
+alter table draw_sessions
+  add column if not exists pending_action_type text;
+
+alter table draw_sessions
+  add column if not exists requested_by_member_id text references pair_members(id) on delete set null;
+
+alter table draw_sessions
+  add column if not exists agreed_by_member_ids text[] not null default '{}';
+
+alter table draw_sessions drop constraint if exists draw_sessions_pending_action_type_check;
+
 update draw_sessions
 set status = 'idle'
 where status in ('draft', 'cancelled');
+
+update draw_sessions
+set status = 'idle',
+    pending_action_type = null,
+    requested_by_member_id = null,
+    agreed_by_member_ids = '{}'
+where status = 'revealed'
+  and result_activity_id is null;
+
+update draw_sessions
+set pending_action_type = case
+    when status = 'pending_accept' then 'accept'
+    when status = 'pending_reroll' then 'reroll'
+    when status = 'pending_change' then 'change'
+    else pending_action_type
+  end
+where status in ('pending_accept', 'pending_reroll', 'pending_change')
+  and pending_action_type is null;
 
 with ranked_draw_sessions as (
   select
@@ -71,7 +117,20 @@ where draw_sessions.ctid = ranked_draw_sessions.ctid
   and ranked_draw_sessions.row_rank > 1;
 
 alter table draw_sessions add constraint draw_sessions_status_check
-  check (status in ('idle', 'drawing', 'revealed', 'accepted'));
+  check (
+    status in (
+      'idle',
+      'drawing',
+      'revealed',
+      'pending_accept',
+      'accepted',
+      'pending_reroll',
+      'pending_change'
+    )
+  );
+
+alter table draw_sessions add constraint draw_sessions_pending_action_type_check
+  check (pending_action_type is null or pending_action_type in ('accept', 'reroll', 'change'));
 
 create table if not exists weekly_activity_bans (
   id text primary key,

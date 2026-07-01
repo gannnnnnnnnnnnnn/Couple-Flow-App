@@ -158,6 +158,39 @@ describe('local persistence', () => {
     expect(loadLocalAppData(storage).data.drawSessions[0].status).toBe('idle');
   });
 
+  it('adds V0 draw result and agreement defaults to older saved sessions', () => {
+    const storage = new MemoryStorage();
+    const data = createDemoLocalAppData();
+    const {
+      result_activity_id: _resultActivityId,
+      pending_action_type: _pendingActionType,
+      requested_by_member_id: _requestedByMemberId,
+      agreed_by_member_ids: _agreedByMemberIds,
+      ...oldDrawSession
+    } = data.drawSessions[0];
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: '2026-06-29T12:00:00.000Z',
+        data: {
+          ...data,
+          drawSessions: [{ ...oldDrawSession, status: 'revealed' }],
+        },
+      }),
+    );
+
+    expect(loadLocalAppData(storage).data.drawSessions[0]).toEqual(
+      expect.objectContaining({
+        status: 'idle',
+        result_activity_id: null,
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      }),
+    );
+  });
+
   it('falls invalid arrays back to empty arrays', () => {
     const storage = new MemoryStorage();
     storage.setItem(

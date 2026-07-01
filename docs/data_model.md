@@ -69,20 +69,14 @@ Each member may create up to two `weekly_activity_bans` per draw session in V0. 
 | `pair_id` | uuid | References `pairs.id` |
 | `target_week_start_date` | date | Week anchor in pair timezone |
 | `created_by_member_id` | uuid | References `pair_members.id` |
-| `status` | text | `idle`, `drawing`, `revealed`, or `accepted` |
+| `status` | text | `idle`, `drawing`, `revealed`, `pending_accept`, `accepted`, `pending_reroll`, or `pending_change` |
+| `result_activity_id` | uuid | Current single draw result; nullable before reveal |
+| `pending_action_type` | text | `accept`, `reroll`, `change`, or null |
+| `requested_by_member_id` | uuid | Member who opened the pending action |
+| `agreed_by_member_ids` | uuid[] | Members who have agreed to the pending action |
 | `created_at` | timestamptz | Created time |
 
-V0 keeps one pragmatic `draw_sessions` state row per pair and target week so a second paired device can see that the partner is already drawing or has revealed a result, instead of starting a competing final draw.
-
-### draw_candidates
-
-| Field | Type | Notes |
-| --- | --- | --- |
-| `id` | uuid | Primary key |
-| `draw_session_id` | uuid | References `draw_sessions.id` |
-| `activity_id` | uuid | References `activities.id` |
-| `position` | integer | Draw order |
-| `selected` | boolean | Accepted candidate |
+V0 keeps one `draw_sessions` state row per pair and target week. A draw reveals exactly one `result_activity_id`; paired accept, reroll, and change actions set a pending state until both members agree. Until status is `accepted`, the target week is not permanently locked.
 
 ### scheduled_sessions
 

@@ -151,6 +151,10 @@ export const drawSessions: DrawSession[] = [
     target_week_start_date: '2026-07-06',
     created_by_member_id: 'member-g',
     status: 'idle',
+    result_activity_id: null,
+    pending_action_type: null,
+    requested_by_member_id: null,
+    agreed_by_member_ids: [],
     created_at: '2026-06-29T00:00:00.000Z',
   },
 ];
