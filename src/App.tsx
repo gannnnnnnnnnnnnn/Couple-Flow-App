@@ -15,6 +15,7 @@ import {
 } from './domain/autosave';
 import type { ImportDataResult } from './domain/settingsSafety';
 import { LOCAL_DEVICE_CLEAR_WARNING } from './domain/settingsSafety';
+import { drawOneActivity, getEligibleActivities } from './domain/draw';
 import {
   classifySessions,
   createOutcome,
@@ -35,10 +36,14 @@ import {
   type PairIdentity,
 } from './domain/localPersistence';
 import {
+  agreeToPendingDrawAction,
+  canRequestDrawAction,
   getActingMemberId,
   getDrawSessionForWeek,
   getDrawSessionId,
   isPartnerDrawActive,
+  rejectPendingDrawAction,
+  requestDrawAgreement,
   shouldShowDrawStaleNotice,
   toggleWeeklyActivityBan,
   upsertDrawSessionState,
@@ -63,6 +68,7 @@ import type {
   BudgetFilter,
   BudgetGroup,
   DrawSession,
+  PendingDrawAction,
   Pair,
   PairMember,
   Rating,
@@ -103,7 +109,6 @@ function App() {
   const [budgetFilter, setBudgetFilter] = useState<BudgetFilter>(
     initialLocalState.data.budgetFilter,
   );
-  const [drawResults, setDrawResults] = useState<Activity[]>([]);
   const [storageSource, setStorageSource] = useState<LocalStateSource>(
     initialLocalState.source,
   );
@@ -126,7 +131,6 @@ function App() {
   const latestUiRef = useRef({
     targetWeekStart: '',
     budgetFilter: 'all' as BudgetFilter,
-    drawResults: [] as Activity[],
     activities: [] as Activity[],
     drawSessions: [] as DrawSession[],
     scheduledSessions: [] as ScheduledSession[],
@@ -174,14 +178,18 @@ function App() {
   const activeMemberId = getActingMemberId(pairIdentity, activeMembers);
   const currentDrawSessionId = getDrawSessionId(activePairId, selectedTargetWeek);
   const currentDrawSession = getDrawSessionForWeek(drawSessions, selectedTargetWeek);
+  const currentDrawResult = currentDrawSession?.result_activity_id
+    ? activityById.get(currentDrawSession.result_activity_id) ?? null
+    : null;
   const partnerDrawActive = pairIdentity
     ? isPartnerDrawActive(currentDrawSession, activeMemberId)
     : false;
+  const pairedAgreementMemberIds = activeMembers.map((member) => member.id);
+  const requiresPairedAgreement = !!pairIdentity && pairedAgreementMemberIds.length > 1;
 
   latestUiRef.current = {
     targetWeekStart: selectedTargetWeek,
     budgetFilter,
-    drawResults,
     activities,
     drawSessions,
     scheduledSessions,
@@ -233,7 +241,11 @@ function App() {
           snapshot.identity?.pairId ?? snapshot.pair.id,
           latestUiRef.current.targetWeekStart,
         ),
-        drawResults: latestUiRef.current.drawResults,
+        resultActivityId:
+          latestUiRef.current.drawSessions.find(
+            (drawSession) =>
+              drawSession.target_week_start_date === latestUiRef.current.targetWeekStart,
+          )?.result_activity_id ?? null,
       })
     ) {
       setDrawNotice('对方刚刚更新了选择，本轮抽签结果可能需要重新抽。');
@@ -247,10 +259,8 @@ function App() {
     if (!preserveDeviceUi) {
       setTargetWeekStart(snapshot.data.targetWeekStart);
       setBudgetFilter(snapshot.data.budgetFilter);
-      setDrawResults([]);
       setDrawNotice(null);
     } else if (authoritativeSharedClear) {
-      setDrawResults([]);
       setDrawNotice(null);
     }
     setStorageSource(snapshot.source);
@@ -436,7 +446,6 @@ function App() {
     setBans(data.weeklyActivityBans);
     setTargetWeekStart(data.targetWeekStart);
     setBudgetFilter(data.budgetFilter);
-    setDrawResults([]);
     setDrawNotice(null);
     setActiveScreen('board');
     setStorageSource(source);
@@ -575,13 +584,11 @@ function App() {
 
   function changeTargetWeek(weekStart: string) {
     setTargetWeekStart(weekStart);
-    setDrawResults([]);
     setDrawNotice(null);
   }
 
   function changeBudget(filter: BudgetFilter) {
     setBudgetFilter(filter);
-    setDrawResults([]);
     setDrawNotice(null);
   }
 
@@ -603,12 +610,15 @@ function App() {
 
       return result.bans;
     });
-    setDrawResults([]);
     setDrawNotice(null);
   }
 
   function startDraw() {
-    if (partnerDrawActive) {
+    if (
+      partnerDrawActive ||
+      currentDrawSession?.status === 'accepted' ||
+      currentDrawSession?.status.startsWith('pending_')
+    ) {
       return false;
     }
 
@@ -620,14 +630,22 @@ function App() {
         targetWeekStart: selectedTargetWeek,
         actingMemberId: activeMemberId,
         status: 'drawing',
+        resultActivityId: null,
+        pendingActionType: null,
+        requestedByMemberId: null,
+        agreedByMemberIds: [],
       }),
     );
     setDrawNotice(null);
     return true;
   }
 
-  function revealDraw(results: Activity[]) {
-    setDrawResults(results);
+  function revealDraw(activity: Activity | null) {
+    if (!activity) {
+      setDrawNotice('暂时没有可抽的活动，先调整屏蔽或预算试试。');
+      return;
+    }
+
     setDrawSessions((sessions) =>
       upsertDrawSessionState({
         drawSessions: sessions,
@@ -636,11 +654,86 @@ function App() {
         targetWeekStart: selectedTargetWeek,
         actingMemberId: activeMemberId,
         status: 'revealed',
+        resultActivityId: activity.id,
+        pendingActionType: null,
+        requestedByMemberId: null,
+        agreedByMemberIds: [],
       }),
     );
+    setDrawNotice(null);
   }
 
   function acceptDraw(activity: Activity) {
+    if (requiresPairedAgreement) {
+      requestPendingDrawAction('accept');
+      return;
+    }
+
+    finalizeAcceptedDraw(activity);
+  }
+
+  function requestPendingDrawAction(actionType: PendingDrawAction) {
+    const drawSession = currentDrawSession;
+    const resultActivityId = drawSession?.result_activity_id ?? null;
+    if (!canRequestDrawAction(drawSession) || !resultActivityId) {
+      return;
+    }
+
+    if (!requiresPairedAgreement) {
+      if (actionType === 'reroll' || actionType === 'change') {
+        revealDraw(drawReplacementResult(resultActivityId));
+      }
+      return;
+    }
+
+    setDrawSessions(
+      requestDrawAgreement({
+        drawSessions,
+        pairId: activePairId,
+        drawSessionId: currentDrawSessionId,
+        targetWeekStart: selectedTargetWeek,
+        actingMemberId: activeMemberId,
+        actionType,
+      }),
+    );
+    setDrawNotice(null);
+  }
+
+  function agreePendingDrawAction() {
+    const result = agreeToPendingDrawAction({
+      drawSessions,
+      pairId: activePairId,
+      drawSessionId: currentDrawSessionId,
+      targetWeekStart: selectedTargetWeek,
+      actingMemberId: activeMemberId,
+      requiredMemberIds: pairedAgreementMemberIds,
+    });
+    setDrawSessions(result.drawSessions);
+
+    if (result.completedAction === 'accept' && currentDrawResult) {
+      finalizeAcceptedDraw(currentDrawResult);
+      return;
+    }
+
+    if (result.completedAction === 'reroll' || result.completedAction === 'change') {
+      revealDraw(drawReplacementResult(currentDrawSession?.result_activity_id ?? null));
+    }
+  }
+
+  function rejectPendingDraw() {
+    setDrawSessions(
+      rejectPendingDrawAction({
+        drawSessions,
+        pairId: activePairId,
+        drawSessionId: currentDrawSessionId,
+        targetWeekStart: selectedTargetWeek,
+        actingMemberId: activeMemberId,
+      }),
+    );
+    setDrawNotice(null);
+  }
+
+  function finalizeAcceptedDraw(activity: Activity) {
     const session = createScheduledSession(
       activity,
       currentDrawSessionId,
@@ -658,11 +751,35 @@ function App() {
         targetWeekStart: selectedTargetWeek,
         actingMemberId: activeMemberId,
         status: 'accepted',
+        resultActivityId: activity.id,
+        pendingActionType: null,
+        requestedByMemberId: null,
+        agreedByMemberIds: [],
       }),
     );
-    setDrawResults([]);
     setDrawNotice(null);
-    setActiveScreen('board');
+  }
+
+  function drawReplacementResult(currentActivityId: string | null) {
+    const eligibleActivities = getEligibleActivities({
+      activities,
+      budgetGroupId: budgetFilter,
+      targetWeekStartDate: selectedTargetWeek,
+      drawSessionId: currentDrawSessionId,
+      bans,
+      scheduledSessions,
+      outcomes,
+    });
+    const replacementPool = currentActivityId
+      ? eligibleActivities.filter((activity) => activity.id !== currentActivityId)
+      : eligibleActivities;
+    const replacement = drawOneActivity(replacementPool);
+
+    if (!replacement) {
+      setDrawNotice('暂时没有别的可换，先保留这个结果。');
+    }
+
+    return replacement;
   }
 
   function completeSession(session: ScheduledSession, rating: Rating) {
@@ -716,7 +833,6 @@ function App() {
       }),
     ]);
     setTargetWeekStart(followUpTargetWeek);
-    setDrawResults([]);
     setActiveScreen('draw');
   }
 
@@ -816,18 +932,22 @@ function App() {
           targetWeekStart={selectedTargetWeek}
           drawSessionId={currentDrawSessionId}
           budgetFilter={budgetFilter}
-          drawResults={drawResults}
+          drawResult={currentDrawResult}
           currentMemberId={activeMemberId}
           currentDrawSession={currentDrawSession}
           drawNotice={drawNotice}
           pairedMode={!!pairIdentity}
           partnerDrawActive={partnerDrawActive}
+          requiresPairedAgreement={requiresPairedAgreement}
           onTargetWeekChange={changeTargetWeek}
           onBudgetChange={changeBudget}
           onToggleBan={toggleBan}
           onStartDraw={startDraw}
           onDraw={revealDraw}
           onAccept={acceptDraw}
+          onRequestAction={requestPendingDrawAction}
+          onAgreePending={agreePendingDrawAction}
+          onRejectPending={rejectPendingDraw}
         />
       )}
       {activeScreen === 'pool' && (

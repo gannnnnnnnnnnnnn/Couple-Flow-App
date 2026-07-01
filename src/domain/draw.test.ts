@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { Activity, ScheduledSession, SessionOutcome, WeeklyActivityBan } from '../types';
-import { getEligibleActivities } from './draw';
+import { drawActivities, drawOneActivity, getEligibleActivities } from './draw';
 
 const baseActivities: Activity[] = [
   {
@@ -59,6 +59,14 @@ function scheduledSession(
 }
 
 describe('draw eligibility', () => {
+  it('draws exactly one activity', () => {
+    const results = drawActivities(baseActivities, undefined, 42);
+    const result = drawOneActivity(baseActivities, 42);
+
+    expect(results).toHaveLength(1);
+    expect(result).toEqual(expect.objectContaining({ id: expect.any(String) }));
+  });
+
   it('excludes activities banned by either member for the draw session', () => {
     const bans: WeeklyActivityBan[] = [
       {

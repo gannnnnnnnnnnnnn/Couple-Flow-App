@@ -9,6 +9,8 @@ import type {
   Activity,
   BudgetFilter,
   DrawSession,
+  DrawSessionStatus,
+  PendingDrawAction,
   ScheduledSession,
   SessionOutcome,
   WeeklyActivityBan,
@@ -19,6 +21,20 @@ export const LOCAL_STATE_STORAGE_KEY = 'couple-flow.local-state.v1';
 export const PAIR_IDENTITY_STORAGE_KEY = 'couple-flow.pair-identity.v1';
 export const DEMO_DISABLED_STORAGE_KEY = 'couple-flow.demo-disabled.v1';
 const DEFAULT_PAIR_TIMEZONE = 'Australia/Melbourne';
+const validDrawStatuses = new Set<DrawSessionStatus>([
+  'idle',
+  'drawing',
+  'revealed',
+  'pending_accept',
+  'accepted',
+  'pending_reroll',
+  'pending_change',
+]);
+const validPendingDrawActions = new Set<PendingDrawAction>([
+  'accept',
+  'reroll',
+  'change',
+]);
 
 export interface LocalAppData {
   activities: Activity[];
@@ -324,12 +340,54 @@ function safeArray<T>(value: T[] | undefined) {
 
 function normalizeDrawSession(drawSession: DrawSession | Record<string, unknown>): DrawSession {
   const rawStatus = drawSession.status;
+  const resultActivityId =
+    typeof drawSession.result_activity_id === 'string' && drawSession.result_activity_id
+      ? drawSession.result_activity_id
+      : null;
+  const pendingActionType = validPendingDrawActions.has(
+    drawSession.pending_action_type as PendingDrawAction,
+  )
+    ? (drawSession.pending_action_type as PendingDrawAction)
+    : null;
+  const status =
+    rawStatus === 'draft' || rawStatus === 'cancelled'
+      ? 'idle'
+      : validDrawStatuses.has(rawStatus as DrawSessionStatus)
+        ? (rawStatus as DrawSessionStatus)
+        : 'idle';
+  const safeStatus =
+    (status === 'revealed' ||
+      status === 'pending_accept' ||
+      status === 'pending_reroll' ||
+      status === 'pending_change') &&
+    !resultActivityId
+      ? 'idle'
+      : status;
+  const hasPendingStatus =
+    safeStatus === 'pending_accept' ||
+    safeStatus === 'pending_reroll' ||
+    safeStatus === 'pending_change';
+  const normalizedStatus = hasPendingStatus && !pendingActionType ? 'revealed' : safeStatus;
+  const normalizedHasPendingStatus =
+    normalizedStatus === 'pending_accept' ||
+    normalizedStatus === 'pending_reroll' ||
+    normalizedStatus === 'pending_change';
+
   return {
     ...drawSession,
-    status:
-      rawStatus === 'draft' || rawStatus === 'cancelled'
-        ? 'idle'
-        : rawStatus,
+    status: normalizedStatus,
+    result_activity_id: resultActivityId,
+    pending_action_type: normalizedHasPendingStatus ? pendingActionType : null,
+    requested_by_member_id:
+      normalizedHasPendingStatus && typeof drawSession.requested_by_member_id === 'string'
+        ? drawSession.requested_by_member_id
+        : null,
+    agreed_by_member_ids:
+      normalizedHasPendingStatus && Array.isArray(drawSession.agreed_by_member_ids)
+        ? drawSession.agreed_by_member_ids.filter(
+            (memberId): memberId is string => typeof memberId === 'string' && !!memberId,
+          )
+        : [],
   } as DrawSession;
 }
 

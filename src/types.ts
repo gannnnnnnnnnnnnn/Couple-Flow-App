@@ -13,6 +13,17 @@ export type Rating = '夯' | '顶级' | '人上人' | 'NPC' | '拉完了';
 
 export type BudgetFilter = 'all' | string;
 
+export type DrawSessionStatus =
+  | 'idle'
+  | 'drawing'
+  | 'revealed'
+  | 'pending_accept'
+  | 'accepted'
+  | 'pending_reroll'
+  | 'pending_change';
+
+export type PendingDrawAction = 'accept' | 'reroll' | 'change';
+
 export interface Pair {
   id: string;
   name: string;
@@ -54,7 +65,11 @@ export interface DrawSession {
   pair_id: string;
   target_week_start_date: string;
   created_by_member_id: string;
-  status: 'idle' | 'drawing' | 'revealed' | 'accepted';
+  status: DrawSessionStatus;
+  result_activity_id: string | null;
+  pending_action_type: PendingDrawAction | null;
+  requested_by_member_id: string | null;
+  agreed_by_member_ids: string[];
   created_at: string;
 }
 

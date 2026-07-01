@@ -678,6 +678,10 @@ function scopeDataForPair(
       ...drawSession,
       pair_id: identity.pairId,
       created_by_member_id: safeMemberId(drawSession.created_by_member_id),
+      requested_by_member_id: drawSession.requested_by_member_id
+        ? safeMemberId(drawSession.requested_by_member_id)
+        : null,
+      agreed_by_member_ids: drawSession.agreed_by_member_ids.map(safeMemberId),
     })),
     scheduledSessions: data.scheduledSessions.map((session) => ({
       ...session,

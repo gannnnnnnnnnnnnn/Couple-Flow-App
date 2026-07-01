@@ -99,4 +99,51 @@ describe('realtime snapshot merging', () => {
       expect.objectContaining({ id: 'ban-own' }),
     ]);
   });
+
+  it('applies remote draw pending state without resetting the device screen inputs', () => {
+    const localData = createEmptyLocalAppData();
+    localData.targetWeekStart = '2026-07-06';
+    localData.budgetFilter = 'budget-tiny';
+    localData.drawSessions = [
+      {
+        id: 'draw-1',
+        pair_id: 'pair-1',
+        target_week_start_date: '2026-07-06',
+        created_by_member_id: 'member-me',
+        status: 'revealed',
+        result_activity_id: 'activity-1',
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+        created_at: '',
+      },
+    ];
+    const remoteData = createEmptyLocalAppData();
+    remoteData.drawSessions = [
+      {
+        ...localData.drawSessions[0],
+        status: 'pending_reroll',
+        pending_action_type: 'reroll',
+        requested_by_member_id: 'member-partner',
+        agreed_by_member_ids: ['member-partner'],
+      },
+    ];
+
+    const merged = mergeRealtimeSnapshotData({
+      actingMemberId: 'member-me',
+      localData,
+      pendingActivityDeleteIds: new Set(),
+      preserveDeviceUi: true,
+      remoteData,
+    });
+
+    expect(merged.targetWeekStart).toBe('2026-07-06');
+    expect(merged.budgetFilter).toBe('budget-tiny');
+    expect(merged.drawSessions[0]).toEqual(
+      expect.objectContaining({
+        status: 'pending_reroll',
+        requested_by_member_id: 'member-partner',
+      }),
+    );
+  });
 });

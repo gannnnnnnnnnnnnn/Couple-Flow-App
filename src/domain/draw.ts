@@ -101,7 +101,7 @@ function seededRandom(seed: number) {
   };
 }
 
-export function drawActivities(eligibleActivities: Activity[], count = 3, seed = Date.now()) {
+export function drawActivities(eligibleActivities: Activity[], count = 1, seed = Date.now()) {
   const random = seededRandom(seed);
   const shuffled = [...eligibleActivities];
 
@@ -111,4 +111,8 @@ export function drawActivities(eligibleActivities: Activity[], count = 3, seed =
   }
 
   return shuffled.slice(0, Math.min(count, shuffled.length));
+}
+
+export function drawOneActivity(eligibleActivities: Activity[], seed = Date.now()) {
+  return drawActivities(eligibleActivities, 1, seed)[0] ?? null;
 }
