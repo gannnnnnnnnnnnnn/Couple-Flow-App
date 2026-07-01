@@ -22,6 +22,7 @@ import {
   disableDemoSeed,
   loadLocalAppData,
   loadPairIdentity,
+  normalizeLocalAppData,
   saveLocalAppData,
   savePairIdentity,
   type LocalAppData,
@@ -461,7 +462,7 @@ export class SupabaseAppRepository implements AppRepository {
         ),
       ]);
 
-    const data: LocalAppData = {
+    const data = normalizeLocalAppData({
       activities,
       drawSessions,
       scheduledSessions,
@@ -469,7 +470,7 @@ export class SupabaseAppRepository implements AppRepository {
       weeklyActivityBans: bans,
       targetWeekStart: loadLocalAppData().data.targetWeekStart,
       budgetFilter: loadLocalAppData().data.budgetFilter,
-    };
+    });
     const savedAt = saveLocalAppData(data);
 
     return {

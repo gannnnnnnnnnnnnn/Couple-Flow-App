@@ -9,6 +9,7 @@ import {
   mergeRemoteBansForPairedDevice,
   rejectPendingDrawAction,
   requestDrawAgreement,
+  resetDrawSessionToIdle,
   shouldShowDrawStaleNotice,
   toggleWeeklyActivityBan,
   upsertDrawSessionState,
@@ -456,7 +457,35 @@ describe('paired draw helpers', () => {
     expect(agreed.completedAction).toBe('accept');
     expect(agreed.drawSessions[0]).toEqual(
       expect.objectContaining({
-        status: 'accepted',
+        status: 'idle',
+        result_activity_id: null,
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      }),
+    );
+  });
+
+  it('resets an accepted draw round to idle so the same week can draw again', () => {
+    const reset = resetDrawSessionToIdle({
+      drawSessions: [
+        drawSession({
+          status: 'pending_accept',
+          pending_action_type: 'accept',
+          requested_by_member_id: 'member-me',
+          agreed_by_member_ids: ['member-me', 'member-partner'],
+        }),
+      ],
+      pairId: 'pair-1',
+      drawSessionId: 'draw-pair-1-2026-07-06',
+      targetWeekStart: '2026-07-06',
+      actingMemberId: 'member-partner',
+    });
+
+    expect(reset[0]).toEqual(
+      expect.objectContaining({
+        status: 'idle',
+        result_activity_id: null,
         pending_action_type: null,
         requested_by_member_id: null,
         agreed_by_member_ids: [],

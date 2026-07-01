@@ -158,6 +158,38 @@ describe('local persistence', () => {
     expect(loadLocalAppData(storage).data.drawSessions[0].status).toBe('idle');
   });
 
+  it('migrates settled accepted draw sessions back to idle', () => {
+    const storage = new MemoryStorage();
+    const data = createDemoLocalAppData();
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: '2026-06-29T12:00:00.000Z',
+        data: {
+          ...data,
+          drawSessions: [
+            {
+              ...data.drawSessions[0],
+              status: 'accepted',
+              result_activity_id: 'activity-night-market',
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(loadLocalAppData(storage).data.drawSessions[0]).toEqual(
+      expect.objectContaining({
+        status: 'idle',
+        result_activity_id: null,
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      }),
+    );
+  });
+
   it('adds V0 draw result and agreement defaults to older saved sessions', () => {
     const storage = new MemoryStorage();
     const data = createDemoLocalAppData();

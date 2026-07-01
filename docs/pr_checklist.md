@@ -65,8 +65,9 @@
 - [x] Explicit shared clear deletes pair-scoped Supabase activities, plans, bans, draw sessions, and outcomes.
 - [x] Removed own weekly bans delete only the matching pair/draw/member/activity row and stay deleted after reload.
 - [x] Activity delete sync deletes unreferenced activities remotely and pauses referenced activities instead.
-- [x] Draw sessions carry a per-target-week `idle` / `drawing` / `revealed` / `pending_accept` / `accepted` / `pending_reroll` / `pending_change` guard.
-- [x] Accepted draw-created scheduled sessions are idempotent by pair, draw session, activity, and target week.
+- [x] Draw sessions carry a per-target-week active-round `idle` / `drawing` / `revealed` / `pending_accept` / `accepted` / `pending_reroll` / `pending_change` guard.
+- [x] Accepted draw-created scheduled sessions are idempotent by pair, draw session, activity, and target week, then reset the draw round to `idle`.
+- [x] A target week can accept multiple different draw-created scheduled sessions; already accepted activities are excluded from that week's next draw pool.
 - [x] Supabase schema guards draw-created scheduled-session duplicates with a migration-safe partial unique index.
 - [x] Autosave is debounced and skips immediate saves after identical remote snapshots are applied.
 - [x] `.env.example` contains placeholders only.

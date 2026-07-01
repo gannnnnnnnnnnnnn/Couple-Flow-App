@@ -52,7 +52,7 @@ function scheduledSession(
     activity_id: activityId,
     draw_session_id: null,
     target_week_start_date: targetWeekStartDate,
-    status: 'completed',
+    status: 'ongoing',
     todo_text: '',
     created_at: '',
   };
@@ -116,6 +116,22 @@ describe('draw eligibility', () => {
         bans: [],
         scheduledSessions,
         outcomes,
+      }).map((activity) => activity.id),
+    ).toEqual(['arcade']);
+  });
+
+  it('excludes already accepted activities from the next draw pool for that target week', () => {
+    const scheduledSessions = [scheduledSession('session-accepted', 'ramen', '2026-07-06')];
+
+    expect(
+      getEligibleActivities({
+        activities: baseActivities,
+        budgetGroupId: 'all',
+        targetWeekStartDate: '2026-07-06',
+        drawSessionId: 'draw-1',
+        bans: [],
+        scheduledSessions,
+        outcomes: [],
       }).map((activity) => activity.id),
     ).toEqual(['arcade']);
   });

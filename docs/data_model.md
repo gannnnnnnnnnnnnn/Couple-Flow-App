@@ -76,7 +76,7 @@ Each member may create up to two `weekly_activity_bans` per draw session in V0. 
 | `agreed_by_member_ids` | uuid[] | Members who have agreed to the pending action |
 | `created_at` | timestamptz | Created time |
 
-V0 keeps one `draw_sessions` state row per pair and target week. A draw reveals exactly one `result_activity_id`; paired accept, reroll, and change actions set a pending state until both members agree. Until status is `accepted`, the target week is not permanently locked.
+V0 keeps one `draw_sessions` active-round state row per pair and target week. A draw reveals exactly one `result_activity_id`; paired accept, reroll, and change actions set a pending state until both members agree. After accept creates or reuses its scheduled session, the draw row returns to `idle` so the same target week can accept more activities.
 
 ### scheduled_sessions
 

@@ -254,12 +254,7 @@ export function DrawScreen({
         </div>
         {partnerDrawActive && (
           <p className="mt-3 rounded-md bg-cream px-3 py-2 text-sm font-bold text-ink/60">
-            对方正在处理这周抽签，这台设备先只读查看。
-          </p>
-        )}
-        {currentDrawSession?.status === 'accepted' && (
-          <p className="mt-3 rounded-md bg-cream px-3 py-2 text-sm font-bold text-ink/60">
-            这周已经收下一个计划了。
+            对方正在处理这周抽签，结果可能会同步更新。
           </p>
         )}
         <button
@@ -268,8 +263,6 @@ export function DrawScreen({
           disabled={
             !eligibleActivities.length ||
             revealing ||
-            partnerDrawActive ||
-            currentDrawSession?.status === 'accepted' ||
             currentDrawSession?.status.startsWith('pending_')
           }
           onClick={runDraw}
@@ -337,10 +330,6 @@ export function DrawScreen({
                     </div>
                   )}
                 </div>
-              ) : currentDrawSession?.status === 'accepted' ? (
-                <p className="mt-5 rounded-md bg-cream/15 px-3 py-2 text-sm font-bold text-cream/82">
-                  已收进待办，完成后再进历史。
-                </p>
               ) : (
                 <div className="mt-5 grid gap-2">
                   <button
