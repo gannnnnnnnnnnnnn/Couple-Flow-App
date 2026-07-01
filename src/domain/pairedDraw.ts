@@ -285,6 +285,12 @@ export function agreeToPendingDrawAction({
   const agreementComplete =
     requiredIds.length > 0 && requiredIds.every((memberId) => agreedByMemberIds.includes(memberId));
   const completedAction = agreementComplete ? existing.pending_action_type : null;
+  const completedStatus =
+    completedAction === 'accept'
+      ? 'accepted'
+      : completedAction
+        ? 'revealed'
+        : existing.status;
 
   return {
     completedAction,
@@ -294,13 +300,42 @@ export function agreeToPendingDrawAction({
       drawSessionId,
       targetWeekStart,
       actingMemberId,
-      status: agreementComplete ? 'revealed' : existing.status,
+      status: completedStatus,
       resultActivityId: existing.result_activity_id,
       pendingActionType: agreementComplete ? null : existing.pending_action_type,
       requestedByMemberId: agreementComplete ? null : existing.requested_by_member_id,
       agreedByMemberIds: agreementComplete ? [] : agreedByMemberIds,
     }),
   };
+}
+
+export function applyDrawReplacementResult({
+  drawSessions,
+  pairId,
+  drawSessionId,
+  targetWeekStart,
+  actingMemberId,
+  resultActivityId,
+}: {
+  drawSessions: DrawSession[];
+  pairId: string;
+  drawSessionId: string;
+  targetWeekStart: string;
+  actingMemberId: string;
+  resultActivityId: string;
+}) {
+  return upsertDrawSessionState({
+    drawSessions,
+    pairId,
+    drawSessionId,
+    targetWeekStart,
+    actingMemberId,
+    status: 'revealed',
+    resultActivityId,
+    pendingActionType: null,
+    requestedByMemberId: null,
+    agreedByMemberIds: [],
+  });
 }
 
 export function rejectPendingDrawAction({

@@ -1,5 +1,5 @@
 import { Sparkles } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { drawOneActivity, getEligibleActivities } from '../domain/draw';
 import { formatWeekLabel } from '../domain/week';
 import type {
@@ -14,6 +14,8 @@ import type {
   WeeklyActivityBan,
 } from '../types';
 import { BudgetPill, Chip, EmptyState, SectionTitle } from './common';
+
+type DrawClickAction = 'accept' | 'agree' | 'change' | 'reject' | 'reroll';
 
 export function DrawScreen({
   activities,
@@ -75,6 +77,7 @@ export function DrawScreen({
   onRejectPending: () => void;
 }) {
   const [revealing, setRevealing] = useState(false);
+  const [pendingClickAction, setPendingClickAction] = useState<DrawClickAction | null>(null);
   const bannableActivities = activities.filter(
     (activity) =>
       activity.status === 'active' &&
@@ -125,6 +128,29 @@ export function DrawScreen({
     currentDrawSession?.status === 'revealed' &&
     !partnerDrawActive &&
     !revealing;
+  const actionButtonsDisabled = pendingClickAction !== null;
+
+  useEffect(() => {
+    setPendingClickAction(null);
+  }, [
+    currentDrawSession?.pending_action_type,
+    currentDrawSession?.result_activity_id,
+    currentDrawSession?.status,
+  ]);
+
+  function runGuardedAction(action: DrawClickAction, callback: () => void) {
+    if (pendingClickAction) {
+      return;
+    }
+
+    setPendingClickAction(action);
+    callback();
+    window.setTimeout(() => {
+      setPendingClickAction((currentAction) =>
+        currentAction === action ? null : currentAction,
+      );
+    }, 1200);
+  }
 
   return (
     <section className="space-y-5">
@@ -293,18 +319,20 @@ export function DrawScreen({
                   {!pendingRequestedByMe && !hasAgreed && (
                     <div className="grid grid-cols-2 gap-2">
                       <button
-                        className="h-11 rounded-md bg-cream px-4 font-bold text-ink"
+                        className="h-11 rounded-md bg-cream px-4 font-bold text-ink disabled:opacity-45"
                         type="button"
-                        onClick={onAgreePending}
+                        disabled={actionButtonsDisabled}
+                        onClick={() => runGuardedAction('agree', onAgreePending)}
                       >
-                        同意
+                        {pendingClickAction === 'agree' ? '处理中' : '同意'}
                       </button>
                       <button
-                        className="h-11 rounded-md bg-white/15 px-4 font-bold text-cream"
+                        className="h-11 rounded-md bg-white/15 px-4 font-bold text-cream disabled:opacity-45"
                         type="button"
-                        onClick={onRejectPending}
+                        disabled={actionButtonsDisabled}
+                        onClick={() => runGuardedAction('reject', onRejectPending)}
                       >
-                        不同意
+                        {pendingClickAction === 'reject' ? '处理中' : '不同意'}
                       </button>
                     </div>
                   )}
@@ -318,27 +346,27 @@ export function DrawScreen({
                   <button
                     className="h-11 w-full rounded-md bg-cream px-4 font-bold text-ink disabled:opacity-45"
                     type="button"
-                    disabled={!canActOnResult}
-                    onClick={() => onAccept(drawResult)}
+                    disabled={!canActOnResult || actionButtonsDisabled}
+                    onClick={() => runGuardedAction('accept', () => onAccept(drawResult))}
                   >
-                    接受
+                    {pendingClickAction === 'accept' ? '处理中' : '接受'}
                   </button>
                   <div className="grid grid-cols-2 gap-2">
                     <button
                       className="h-11 rounded-md bg-white/15 px-4 font-bold text-cream disabled:opacity-45"
                       type="button"
-                      disabled={!canActOnResult}
-                      onClick={() => onRequestAction('reroll')}
+                      disabled={!canActOnResult || actionButtonsDisabled}
+                      onClick={() => runGuardedAction('reroll', () => onRequestAction('reroll'))}
                     >
-                      重抽
+                      {pendingClickAction === 'reroll' ? '处理中' : '重抽'}
                     </button>
                     <button
                       className="h-11 rounded-md bg-white/15 px-4 font-bold text-cream disabled:opacity-45"
                       type="button"
-                      disabled={!canActOnResult}
-                      onClick={() => onRequestAction('change')}
+                      disabled={!canActOnResult || actionButtonsDisabled}
+                      onClick={() => runGuardedAction('change', () => onRequestAction('change'))}
                     >
-                      换一个
+                      {pendingClickAction === 'change' ? '处理中' : '换一个'}
                     </button>
                   </div>
                 </div>

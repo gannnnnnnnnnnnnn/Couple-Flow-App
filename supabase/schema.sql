@@ -167,6 +167,44 @@ create table if not exists session_outcomes (
   created_at timestamptz not null default now()
 );
 
+-- Prevent duplicate accepted draw-created plans. Existing duplicate scheduled
+-- rows are folded onto the earliest row for the same pair/draw/activity/week
+-- before the partial unique index is added.
+with ranked_scheduled_draw_sessions as (
+  select
+    id,
+    first_value(id) over (
+      partition by pair_id, draw_session_id, activity_id, target_week_start_date
+      order by created_at asc, id asc
+    ) as keeper_id,
+    row_number() over (
+      partition by pair_id, draw_session_id, activity_id, target_week_start_date
+      order by created_at asc, id asc
+    ) as row_rank
+  from scheduled_sessions
+  where draw_session_id is not null
+)
+update session_outcomes
+set scheduled_session_id = ranked_scheduled_draw_sessions.keeper_id
+from ranked_scheduled_draw_sessions
+where session_outcomes.scheduled_session_id = ranked_scheduled_draw_sessions.id
+  and ranked_scheduled_draw_sessions.row_rank > 1;
+
+with ranked_scheduled_draw_sessions as (
+  select
+    ctid,
+    row_number() over (
+      partition by pair_id, draw_session_id, activity_id, target_week_start_date
+      order by created_at asc, id asc
+    ) as row_rank
+  from scheduled_sessions
+  where draw_session_id is not null
+)
+delete from scheduled_sessions
+using ranked_scheduled_draw_sessions
+where scheduled_sessions.ctid = ranked_scheduled_draw_sessions.ctid
+  and ranked_scheduled_draw_sessions.row_rank > 1;
+
 create index if not exists pair_members_pair_id_idx on pair_members(pair_id);
 create index if not exists budget_groups_pair_id_idx on budget_groups(pair_id);
 create index if not exists activities_pair_id_idx on activities(pair_id);
@@ -175,6 +213,9 @@ create unique index if not exists draw_sessions_pair_week_idx
   on draw_sessions(pair_id, target_week_start_date);
 create index if not exists weekly_activity_bans_pair_id_idx on weekly_activity_bans(pair_id);
 create index if not exists scheduled_sessions_pair_id_idx on scheduled_sessions(pair_id);
+create unique index if not exists scheduled_sessions_draw_result_unique_idx
+  on scheduled_sessions(pair_id, draw_session_id, activity_id, target_week_start_date)
+  where draw_session_id is not null;
 create index if not exists session_outcomes_pair_id_idx on session_outcomes(pair_id);
 
 alter table pairs enable row level security;

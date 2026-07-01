@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import type { Activity, DrawSession, PairMember, WeeklyActivityBan } from '../types';
 import {
   agreeToPendingDrawAction,
+  applyDrawReplacementResult,
   getActingMemberId,
   getDrawSessionId,
   isPartnerDrawActive,
@@ -294,6 +295,42 @@ describe('paired draw helpers', () => {
     expect(secondAgreement.drawSessions[0]).toEqual(
       expect.objectContaining({
         status: 'revealed',
+        result_activity_id: 'activity-1',
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      }),
+    );
+  });
+
+  it('reroll agreement updates the result and clears pending state', () => {
+    const pending = drawSession({
+      status: 'pending_reroll',
+      pending_action_type: 'reroll',
+      requested_by_member_id: 'member-me',
+      agreed_by_member_ids: ['member-me'],
+    });
+    const agreed = agreeToPendingDrawAction({
+      drawSessions: [pending],
+      pairId: 'pair-1',
+      drawSessionId: pending.id,
+      targetWeekStart: pending.target_week_start_date,
+      actingMemberId: 'member-partner',
+      requiredMemberIds: ['member-me', 'member-partner'],
+    });
+    const replaced = applyDrawReplacementResult({
+      drawSessions: agreed.drawSessions,
+      pairId: 'pair-1',
+      drawSessionId: pending.id,
+      targetWeekStart: pending.target_week_start_date,
+      actingMemberId: 'member-partner',
+      resultActivityId: 'activity-2',
+    });
+
+    expect(replaced[0]).toEqual(
+      expect.objectContaining({
+        status: 'revealed',
+        result_activity_id: 'activity-2',
         pending_action_type: null,
         requested_by_member_id: null,
         agreed_by_member_ids: [],
@@ -322,6 +359,70 @@ describe('paired draw helpers', () => {
         status: 'revealed',
         result_activity_id: 'activity-1',
         pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      }),
+    );
+  });
+
+  it('change agreement updates the result and clears pending state', () => {
+    const pending = drawSession({
+      status: 'pending_change',
+      pending_action_type: 'change',
+      requested_by_member_id: 'member-me',
+      agreed_by_member_ids: ['member-me'],
+    });
+    const agreed = agreeToPendingDrawAction({
+      drawSessions: [pending],
+      pairId: 'pair-1',
+      drawSessionId: pending.id,
+      targetWeekStart: pending.target_week_start_date,
+      actingMemberId: 'member-partner',
+      requiredMemberIds: ['member-me', 'member-partner'],
+    });
+    const replaced = applyDrawReplacementResult({
+      drawSessions: agreed.drawSessions,
+      pairId: 'pair-1',
+      drawSessionId: pending.id,
+      targetWeekStart: pending.target_week_start_date,
+      actingMemberId: 'member-partner',
+      resultActivityId: 'activity-3',
+    });
+
+    expect(replaced[0]).toEqual(
+      expect.objectContaining({
+        status: 'revealed',
+        result_activity_id: 'activity-3',
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      }),
+    );
+  });
+
+  it('keeps the current result and clears pending state when no replacement exists', () => {
+    const pending = drawSession({
+      status: 'pending_change',
+      pending_action_type: 'change',
+      requested_by_member_id: 'member-me',
+      agreed_by_member_ids: ['member-me'],
+    });
+    const agreed = agreeToPendingDrawAction({
+      drawSessions: [pending],
+      pairId: 'pair-1',
+      drawSessionId: pending.id,
+      targetWeekStart: pending.target_week_start_date,
+      actingMemberId: 'member-partner',
+      requiredMemberIds: ['member-me', 'member-partner'],
+    });
+
+    expect(agreed.drawSessions[0]).toEqual(
+      expect.objectContaining({
+        status: 'revealed',
+        result_activity_id: 'activity-1',
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
       }),
     );
   });
@@ -353,5 +454,13 @@ describe('paired draw helpers', () => {
     });
 
     expect(agreed.completedAction).toBe('accept');
+    expect(agreed.drawSessions[0]).toEqual(
+      expect.objectContaining({
+        status: 'accepted',
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      }),
+    );
   });
 });
