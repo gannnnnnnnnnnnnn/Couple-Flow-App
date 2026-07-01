@@ -355,14 +355,15 @@ function normalizeDrawSession(drawSession: DrawSession | Record<string, unknown>
       : validDrawStatuses.has(rawStatus as DrawSessionStatus)
         ? (rawStatus as DrawSessionStatus)
         : 'idle';
+  const settledStatus = status === 'accepted' ? 'idle' : status;
   const safeStatus =
-    (status === 'revealed' ||
-      status === 'pending_accept' ||
-      status === 'pending_reroll' ||
-      status === 'pending_change') &&
+    (settledStatus === 'revealed' ||
+      settledStatus === 'pending_accept' ||
+      settledStatus === 'pending_reroll' ||
+      settledStatus === 'pending_change') &&
     !resultActivityId
       ? 'idle'
-      : status;
+      : settledStatus;
   const hasPendingStatus =
     safeStatus === 'pending_accept' ||
     safeStatus === 'pending_reroll' ||
@@ -376,7 +377,7 @@ function normalizeDrawSession(drawSession: DrawSession | Record<string, unknown>
   return {
     ...drawSession,
     status: normalizedStatus,
-    result_activity_id: resultActivityId,
+    result_activity_id: normalizedStatus === 'idle' ? null : resultActivityId,
     pending_action_type: normalizedHasPendingStatus ? pendingActionType : null,
     requested_by_member_id:
       normalizedHasPendingStatus && typeof drawSession.requested_by_member_id === 'string'

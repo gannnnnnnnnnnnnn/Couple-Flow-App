@@ -170,7 +170,8 @@ export function upsertDrawSessionState({
     id: existing?.id ?? drawSessionId,
     pair_id: pairId,
     target_week_start_date: targetWeekStart,
-    created_by_member_id: existing?.created_by_member_id ?? actingMemberId,
+    created_by_member_id:
+      status === 'drawing' ? actingMemberId : existing?.created_by_member_id ?? actingMemberId,
     status,
     result_activity_id:
       resultActivityId === undefined ? existing?.result_activity_id ?? null : resultActivityId,
@@ -287,7 +288,7 @@ export function agreeToPendingDrawAction({
   const completedAction = agreementComplete ? existing.pending_action_type : null;
   const completedStatus =
     completedAction === 'accept'
-      ? 'accepted'
+      ? 'idle'
       : completedAction
         ? 'revealed'
         : existing.status;
@@ -301,12 +302,44 @@ export function agreeToPendingDrawAction({
       targetWeekStart,
       actingMemberId,
       status: completedStatus,
-      resultActivityId: existing.result_activity_id,
+      resultActivityId: completedAction === 'accept' ? null : existing.result_activity_id,
       pendingActionType: agreementComplete ? null : existing.pending_action_type,
       requestedByMemberId: agreementComplete ? null : existing.requested_by_member_id,
       agreedByMemberIds: agreementComplete ? [] : agreedByMemberIds,
     }),
   };
+}
+
+export function resetDrawSessionToIdle({
+  drawSessions,
+  pairId,
+  drawSessionId,
+  targetWeekStart,
+  actingMemberId,
+}: {
+  drawSessions: DrawSession[];
+  pairId: string;
+  drawSessionId: string;
+  targetWeekStart: string;
+  actingMemberId: string;
+}) {
+  const existing = getDrawSessionForWeek(drawSessions, targetWeekStart);
+  if (!existing) {
+    return drawSessions;
+  }
+
+  return upsertDrawSessionState({
+    drawSessions,
+    pairId,
+    drawSessionId,
+    targetWeekStart,
+    actingMemberId,
+    status: 'idle',
+    resultActivityId: null,
+    pendingActionType: null,
+    requestedByMemberId: null,
+    agreedByMemberIds: [],
+  });
 }
 
 export function applyDrawReplacementResult({

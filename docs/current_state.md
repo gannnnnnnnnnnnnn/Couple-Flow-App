@@ -48,8 +48,8 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Draw supports target week, budget filter, split 我的屏蔽 / 对方的屏蔽 sections, two per-member activity bans, eligible count, one persisted draw result, accept, 重抽, and 换一个.
 - Draw realtime applies shared changes quietly without changing the current screen, week, budget tab, visible result, or local form/draft state; if partner choice changes make a visible draw result stale, the draw screen shows `对方刚刚更新了选择，本轮抽签结果可能需要重新抽。`
 - An empty remote pair snapshot from shared clear is authoritative, so other connected devices do not preserve or re-upload stale local activities, draw sessions, plans, outcomes, or bans.
-- Draw sessions use a per-target-week state row with `idle`, `drawing`, `revealed`, `pending_accept`, `accepted`, `pending_reroll`, and `pending_change`; paired accept, 重抽, and 换一个 requests wait for both members before changing the result or creating the scheduled session.
-- Accepted draw finalization is idempotent by pair, draw session, activity, and target week; repeated agreement taps reuse the existing scheduled session and clear pending draw fields.
+- Draw sessions use a per-target-week active-round row with `idle`, `drawing`, `revealed`, `pending_accept`, `accepted`, `pending_reroll`, and `pending_change`; paired accept, 重抽, and 换一个 requests wait for both members before changing the result or creating the scheduled session.
+- Accepted draw finalization creates or reuses one scheduled session, then resets the same target-week draw row to `idle` so the couple can draw another activity for that week immediately.
 - Supabase schema includes a partial unique index for draw-created scheduled sessions where `draw_session_id` is present, with a migration block that deduplicates existing rows first.
 - Ongoing plans support Done, Not done, Replace, and Redraw outcomes.
 - Critical state rule is represented in UI data flow: draw/accept creates a scheduled session, not history.

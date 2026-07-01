@@ -24,6 +24,12 @@ const activity: Activity = {
   created_at: '',
 };
 
+const secondActivity: Activity = {
+  ...activity,
+  id: 'arcade',
+  title: 'Arcade',
+};
+
 describe('state transitions', () => {
   it('accepted draw creates a scheduled session but not history', () => {
     const session = createScheduledSession(
@@ -111,6 +117,83 @@ describe('state transitions', () => {
     });
 
     expect(result.scheduledSessions).toEqual([first]);
+  });
+
+  it('allows the same target week to accept two different draw-created activities', () => {
+    const first = upsertAcceptedDrawScheduledSession({
+      activity,
+      currentWeekStart: '2026-06-29',
+      drawSessionId: 'draw-1',
+      pairId: 'pair',
+      scheduledSessions: [],
+      targetWeekStartDate: '2026-07-06',
+      now: new Date('2026-07-01T00:00:00.000Z'),
+    });
+    const second = upsertAcceptedDrawScheduledSession({
+      activity: secondActivity,
+      currentWeekStart: '2026-06-29',
+      drawSessionId: 'draw-1',
+      pairId: 'pair',
+      scheduledSessions: first.scheduledSessions,
+      targetWeekStartDate: '2026-07-06',
+      now: new Date('2026-07-01T00:01:00.000Z'),
+    });
+
+    expect(second.scheduledSessions.map((session) => session.activity_id)).toEqual([
+      'ramen',
+      'arcade',
+    ]);
+  });
+
+  it('classifies future accepted sessions as planning', () => {
+    const futureSession = createScheduledSession(
+      activity,
+      'draw-1',
+      'pair',
+      '2026-07-06',
+      '2026-06-29',
+    );
+
+    const classified = classifySessions([futureSession], [], '2026-06-29');
+
+    expect(classified.planningSessions).toEqual([futureSession]);
+    expect(classified.ongoingSessions).toEqual([]);
+    expect(classified.needsReviewSessions).toEqual([]);
+    expect(classified.historySessions).toEqual([]);
+  });
+
+  it('classifies current-week accepted sessions as ongoing', () => {
+    const currentSession = createScheduledSession(
+      activity,
+      'draw-1',
+      'pair',
+      '2026-06-29',
+      '2026-06-29',
+    );
+
+    const classified = classifySessions([currentSession], [], '2026-06-29');
+
+    expect(classified.ongoingSessions).toEqual([currentSession]);
+    expect(classified.planningSessions).toEqual([]);
+    expect(classified.needsReviewSessions).toEqual([]);
+    expect(classified.historySessions).toEqual([]);
+  });
+
+  it('classifies past accepted sessions without outcomes as needs review', () => {
+    const pastSession = createScheduledSession(
+      activity,
+      'draw-1',
+      'pair',
+      '2026-06-22',
+      '2026-06-29',
+    );
+
+    const classified = classifySessions([pastSession], [], '2026-06-29');
+
+    expect(classified.needsReviewSessions).toEqual([pastSession]);
+    expect(classified.ongoingSessions).toEqual([]);
+    expect(classified.planningSessions).toEqual([]);
+    expect(classified.historySessions).toEqual([]);
   });
 
   it('outcome makes a scheduled session history eligible', () => {

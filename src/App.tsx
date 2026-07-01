@@ -53,6 +53,7 @@ import {
   isPartnerDrawActive,
   rejectPendingDrawAction,
   requestDrawAgreement,
+  resetDrawSessionToIdle,
   shouldShowDrawStaleNotice,
   toggleWeeklyActivityBan,
   upsertDrawSessionState,
@@ -88,6 +89,12 @@ import type {
 
 function getInitialLocalState(): LocalStateLoadResult {
   return loadLocalAppData();
+}
+
+function getAcceptedDrawNotice(targetWeekStart: string, currentWeekStart: string) {
+  return targetWeekStart > currentWeekStart
+    ? '已加入下周计划。你们可以继续抽下一个。'
+    : '已加入本周待办。你们可以继续抽下一个。';
 }
 
 function App() {
@@ -683,11 +690,7 @@ function App() {
   }
 
   function startDraw() {
-    if (
-      partnerDrawActive ||
-      currentDrawSession?.status === 'accepted' ||
-      currentDrawSession?.status.startsWith('pending_')
-    ) {
+    if (currentDrawSession?.status.startsWith('pending_')) {
       return false;
     }
 
@@ -839,20 +842,15 @@ function App() {
         }).scheduledSessions,
     );
     setDrawSessions((sessions) =>
-      upsertDrawSessionState({
+      resetDrawSessionToIdle({
         drawSessions: nextDrawSessions ?? sessions,
         pairId: activePairId,
         drawSessionId: currentDrawSessionId,
         targetWeekStart: selectedTargetWeek,
         actingMemberId: activeMemberId,
-        status: 'accepted',
-        resultActivityId: activity.id,
-        pendingActionType: null,
-        requestedByMemberId: null,
-        agreedByMemberIds: [],
       }),
     );
-    setDrawNotice(null);
+    setDrawNotice(getAcceptedDrawNotice(selectedTargetWeek, currentWeekStart));
   }
 
   function runDrawMutationOnce(key: string, mutation: () => void) {
