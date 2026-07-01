@@ -240,8 +240,43 @@ describe('paired draw helpers', () => {
       {
         ...existing,
         status: 'drawing',
+        created_by_member_id: 'member-me',
       },
     ]);
+  });
+
+  it('assigns a new drawing round to the member who starts it after idle reset', () => {
+    const reset = resetDrawSessionToIdle({
+      drawSessions: [
+        drawSession({
+          created_by_member_id: 'member-me',
+          status: 'pending_accept',
+          pending_action_type: 'accept',
+          requested_by_member_id: 'member-me',
+          agreed_by_member_ids: ['member-me', 'member-partner'],
+        }),
+      ],
+      pairId: 'pair-1',
+      drawSessionId: 'draw-pair-1-2026-07-06',
+      targetWeekStart: '2026-07-06',
+      actingMemberId: 'member-me',
+    });
+
+    const nextDrawing = upsertDrawSessionState({
+      drawSessions: reset,
+      pairId: 'pair-1',
+      drawSessionId: 'draw-pair-1-2026-07-06',
+      targetWeekStart: '2026-07-06',
+      actingMemberId: 'member-partner',
+      status: 'drawing',
+    });
+
+    expect(nextDrawing[0]).toEqual(
+      expect.objectContaining({
+        status: 'drawing',
+        created_by_member_id: 'member-partner',
+      }),
+    );
   });
 
   it('creates a pending reroll request without changing the current result', () => {

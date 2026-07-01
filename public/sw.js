@@ -1,4 +1,4 @@
-const APP_VERSION = '2026-07-01-pr12';
+const APP_VERSION = '2026-07-01-pr13';
 const CACHE_NAME = `couple-flow-${APP_VERSION}`;
 const APP_SHELL = ['/manifest.webmanifest', '/icons/icon.svg', '/version.json'];
 
