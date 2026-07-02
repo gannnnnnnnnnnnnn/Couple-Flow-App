@@ -28,6 +28,33 @@ describe('app backup import/export', () => {
     }
   });
 
+  it('preserves pending plan action fields through backup import', () => {
+    const data = createDemoLocalAppData();
+    data.scheduledSessions = [
+      {
+        ...data.scheduledSessions[0],
+        pending_action_type: 'replace',
+        pending_requested_by_member_id: 'member-g',
+        pending_agreed_by_member_ids: ['member-g'],
+        pending_target_week_start_date: null,
+        pending_replacement_activity_id: 'activity-arcade',
+        pending_reason: null,
+      },
+    ];
+
+    const result = parseAppBackupJson(stringifyAppBackup(data));
+
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.backup.data.scheduledSessions[0]).toMatchObject({
+        pending_action_type: 'replace',
+        pending_requested_by_member_id: 'member-g',
+        pending_agreed_by_member_ids: ['member-g'],
+        pending_replacement_activity_id: 'activity-arcade',
+      });
+    }
+  });
+
   it('keeps older backups without draw sessions importable', () => {
     const data = createDemoLocalAppData();
     const { drawSessions: _drawSessions, ...oldData } = data;

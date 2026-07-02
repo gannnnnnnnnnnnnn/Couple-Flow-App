@@ -4,7 +4,7 @@ import { DrawScreen } from './components/DrawScreen';
 import { HistoryScreen } from './components/HistoryScreen';
 import { PoolScreen } from './components/PoolScreen';
 import { SettingsScreen } from './components/SettingsScreen';
-import { WeekBoard } from './components/WeekBoard';
+import { WeekBoard, type PlanActionCommand } from './components/WeekBoard';
 import type { Screen } from './components/common';
 import { parseAppBackupJson, stringifyAppBackup } from './domain/backup';
 import {
@@ -25,15 +25,26 @@ import {
 } from './domain/appVersion';
 import {
   classifySessions,
+  applyCompletedPlanAction,
   createOutcome,
-  createScheduledSession,
+  createCancelPlanAction,
+  createMoveWeekPlanAction,
+  createRedrawPlanAction,
+  createReplacementPlanAction,
   deleteOrPauseActivity,
-  getFollowUpTargetWeek,
   getOutcomeBySessionId,
   isActivityReferenced,
+  agreeToPendingPlanAction,
+  rejectPendingPlanAction,
+  requestPendingPlanAction,
   upsertAcceptedDrawScheduledSession,
+  type CompletedPlanAction,
 } from './domain/state';
 import { getNextWeekStartDate, getWeekStartDate } from './domain/week';
+import {
+  getEffectivePairedAgreementMembers,
+  hasExtraRawPairMembers,
+} from './domain/pairedAgreement';
 import {
   createDemoLocalAppData,
   enableDemoSeed,
@@ -155,7 +166,9 @@ function App() {
     bans: [] as WeeklyActivityBan[],
   });
   const [drawNotice, setDrawNotice] = useState<string | null>(null);
+  const [planNotice, setPlanNotice] = useState<string | null>(null);
   const pendingDrawMutationKeyRef = useRef<string | null>(null);
+  const pendingPlanMutationKeyRef = useRef<string | null>(null);
 
   const currentWeekStart = useMemo(
     () => getWeekStartDate(new Date(), activePair.timezone),
@@ -194,6 +207,10 @@ function App() {
 
   const activePairId = pairIdentity?.pairId ?? activePair.id;
   const activeMemberId = getActingMemberId(pairIdentity, activeMembers);
+  const effectivePairedAgreementMembers = useMemo(
+    () => getEffectivePairedAgreementMembers(activeMembers, activeMemberId),
+    [activeMemberId, activeMembers],
+  );
   const currentDrawSessionId = getDrawSessionId(activePairId, selectedTargetWeek);
   const currentDrawSession = getDrawSessionForWeek(drawSessions, selectedTargetWeek);
   const currentDrawResult = currentDrawSession?.result_activity_id
@@ -202,8 +219,9 @@ function App() {
   const partnerDrawActive = pairIdentity
     ? isPartnerDrawActive(currentDrawSession, activeMemberId)
     : false;
-  const pairedAgreementMemberIds = activeMembers.map((member) => member.id);
+  const pairedAgreementMemberIds = effectivePairedAgreementMembers.map((member) => member.id);
   const requiresPairedAgreement = !!pairIdentity && pairedAgreementMemberIds.length > 1;
+  const hasDuplicateMemberWarning = !!pairIdentity && hasExtraRawPairMembers(activeMembers);
 
   latestUiRef.current = {
     targetWeekStart: selectedTargetWeek,
@@ -894,6 +912,7 @@ function App() {
       ...currentOutcomes,
       createOutcome(session, 'completed', { rating }),
     ]);
+    setPlanNotice('计划已更新');
   }
 
   function missSession(session: ScheduledSession, reason: string) {
@@ -901,46 +920,139 @@ function App() {
       ...currentOutcomes,
       createOutcome(session, 'not_done', { reason }),
     ]);
+    setPlanNotice('计划已更新');
   }
 
-  function replaceSession(session: ScheduledSession, replacementActivityId: string) {
-    const replacement = activityById.get(replacementActivityId);
-    if (!replacement) {
+  function handlePlanAction(session: ScheduledSession, command: PlanActionCommand) {
+    if (command.type === 'complete') {
+      completeSession(session, command.rating);
       return;
     }
 
-    setOutcomes((currentOutcomes) => [
-      ...currentOutcomes,
-      createOutcome(session, 'replaced', {
-        replacementActivityId,
-        agreedByMemberIds: activeMembers.map((member) => member.id),
-      }),
-    ]);
-    const followUpTargetWeek = getFollowUpTargetWeek(session, currentWeekStart);
+    if (command.type === 'not_done') {
+      missSession(session, command.reason);
+      return;
+    }
 
-    setScheduledSessions((sessions) => [
-      ...sessions,
-      createScheduledSession(
-        replacement,
-        `manual-replace-${session.id}`,
-        activePairId,
-        followUpTargetWeek,
-        currentWeekStart,
-      ),
-    ]);
+    const action = getCompletedPlanActionForCommand(session, command);
+    if (!action) {
+      return;
+    }
+
+    runPlanMutationOnce(`plan-request:${session.id}:${command.type}`, () => {
+      if (requiresPairedAgreement) {
+        setScheduledSessions(
+          requestPendingPlanAction({
+            scheduledSessions,
+            sessionId: session.id,
+            actingMemberId: activeMemberId,
+            request: {
+              type: action.type,
+              targetWeekStartDate: action.targetWeekStartDate,
+              replacementActivityId: action.replacementActivityId,
+              reason: action.reason,
+            },
+          }),
+        );
+        setPlanNotice('等待对方同意');
+        return;
+      }
+
+      applyPlanAction(action);
+    });
   }
 
-  function redrawSession(session: ScheduledSession) {
-    const followUpTargetWeek = getFollowUpTargetWeek(session, currentWeekStart);
+  function agreePendingPlanAction(session: ScheduledSession) {
+    runPlanMutationOnce(`plan-agree:${session.id}:${session.pending_action_type}`, () => {
+      const result = agreeToPendingPlanAction({
+        scheduledSessions,
+        sessionId: session.id,
+        actingMemberId: activeMemberId,
+        requiredMemberIds: pairedAgreementMemberIds,
+      });
 
-    setOutcomes((currentOutcomes) => [
-      ...currentOutcomes,
-      createOutcome(session, 'redrawn', {
-        agreedByMemberIds: activeMembers.map((member) => member.id),
-      }),
-    ]);
-    setTargetWeekStart(followUpTargetWeek);
-    setActiveScreen('draw');
+      setScheduledSessions(result.scheduledSessions);
+      if (result.completedAction) {
+        applyPlanAction(result.completedAction, result.scheduledSessions, outcomes);
+      } else {
+        setPlanNotice('等待对方同意');
+      }
+    });
+  }
+
+  function rejectPendingPlan(session: ScheduledSession) {
+    runPlanMutationOnce(`plan-reject:${session.id}:${session.pending_action_type}`, () => {
+      setScheduledSessions(
+        rejectPendingPlanAction({
+          scheduledSessions,
+          sessionId: session.id,
+        }),
+      );
+    });
+  }
+
+  function getCompletedPlanActionForCommand(
+    session: ScheduledSession,
+    command: Exclude<PlanActionCommand, { type: 'complete' | 'not_done' }>,
+  ): CompletedPlanAction | null {
+    if (command.type === 'move_week') {
+      return createMoveWeekPlanAction(session.id, command.targetWeekStartDate);
+    }
+
+    if (command.type === 'replace') {
+      return createReplacementPlanAction(session.id, command.replacementActivityId);
+    }
+
+    if (command.type === 'redraw') {
+      return createRedrawPlanAction(session.id);
+    }
+
+    if (command.type === 'cancel') {
+      return createCancelPlanAction(session.id);
+    }
+
+    return null;
+  }
+
+  function applyPlanAction(
+    action: CompletedPlanAction,
+    sourceScheduledSessions = scheduledSessions,
+    sourceOutcomes = outcomes,
+  ) {
+    const result = applyCompletedPlanAction({
+      action,
+      activities,
+      currentWeekStart,
+      outcomes: sourceOutcomes,
+      pairId: activePairId,
+      scheduledSessions: sourceScheduledSessions,
+    });
+
+    setScheduledSessions(result.scheduledSessions);
+    setOutcomes(result.outcomes);
+
+    if (result.routeToDrawWeek) {
+      setTargetWeekStart(result.routeToDrawWeek);
+      setDrawNotice('已进入重新抽签');
+      setActiveScreen('draw');
+      return;
+    }
+
+    setPlanNotice(action.type === 'cancel' ? '计划已取消' : '计划已更新');
+  }
+
+  function runPlanMutationOnce(key: string, mutation: () => void) {
+    if (pendingPlanMutationKeyRef.current === key) {
+      return;
+    }
+
+    pendingPlanMutationKeyRef.current = key;
+    mutation();
+    window.setTimeout(() => {
+      if (pendingPlanMutationKeyRef.current === key) {
+        pendingPlanMutationKeyRef.current = null;
+      }
+    }, 450);
   }
 
   function addActivity(activity: Activity) {
@@ -1020,21 +1132,28 @@ function App() {
           </button>
         </div>
       )}
+      {planNotice && activeScreen === 'board' && (
+        <p className="mb-4 rounded-md bg-mint/30 px-3 py-2 text-sm font-black text-ink">
+          {planNotice}
+        </p>
+      )}
       {activeScreen === 'board' && (
         <WeekBoard
           activityById={activityById}
           activities={activities}
           budgetById={budgetById}
+          currentMemberId={activeMemberId}
           currentWeekStart={currentWeekStart}
           members={activeMembers}
           needsReviewSessions={needsReviewSessions}
           ongoingSessions={ongoingSessions}
+          outcomes={outcomes}
+          pairedMode={requiresPairedAgreement}
           planningSessions={planningSessions}
-          onComplete={completeSession}
-          onNotDone={missSession}
-          onReplace={replaceSession}
-          onRedraw={redrawSession}
+          onAgreePendingPlanAction={agreePendingPlanAction}
           onNavigate={setActiveScreen}
+          onPlanAction={handlePlanAction}
+          onRejectPendingPlanAction={rejectPendingPlan}
         />
       )}
       {activeScreen === 'draw' && (
@@ -1109,6 +1228,7 @@ function App() {
             source: storageSource,
             savedAt: lastSavedAt,
           }}
+          duplicateMemberWarning={hasDuplicateMemberWarning}
           onCreatePair={createPairCode}
           onClearLocalData={clearLocalUserData}
           onExportData={exportAppData}

@@ -90,6 +90,12 @@ class FakeSupabase {
         target_week_start_date: '2026-06-29',
         status: 'ongoing',
         todo_text: '',
+        pending_action_type: null,
+        pending_requested_by_member_id: null,
+        pending_agreed_by_member_ids: [],
+        pending_target_week_start_date: null,
+        pending_replacement_activity_id: null,
+        pending_reason: null,
         created_at: '2026-06-29T00:00:00.000Z',
       },
     ],
@@ -377,6 +383,46 @@ describe('repository helpers', () => {
     expect(fake.operations.some((operation) => operation.type === 'delete')).toBe(false);
     expect(fake.tables.activities).toEqual([
       expect.objectContaining({ id: 'activity-remote-only' }),
+    ]);
+  });
+
+  it('Supabase save preserves scheduled-session pending plan action fields', async () => {
+    const fake = new FakeSupabase();
+    const repository = new SupabaseAppRepository(fake as unknown as SupabaseClient);
+    const localData = createDemoLocalAppData();
+    localData.scheduledSessions = [
+      {
+        ...localData.scheduledSessions[0],
+        id: 'session-pending',
+        pending_action_type: 'move_week',
+        pending_requested_by_member_id: 'member-existing',
+        pending_agreed_by_member_ids: ['member-existing'],
+        pending_target_week_start_date: '2026-07-06',
+        pending_replacement_activity_id: null,
+        pending_reason: null,
+      },
+    ];
+
+    await repository.saveSnapshot(localData, {
+      pairId: 'pair-remote',
+      memberId: 'member-existing',
+      pairCode: 'ABC123',
+      displayName: 'Existing',
+    });
+
+    const scheduledUpsert = fake.operations.find(
+      (operation) => operation.table === 'scheduled_sessions' && operation.type === 'upsert',
+    )?.rows as Record<string, unknown>[];
+
+    expect(scheduledUpsert).toEqual([
+      expect.objectContaining({
+        id: 'session-pending',
+        pair_id: 'pair-remote',
+        pending_action_type: 'move_week',
+        pending_requested_by_member_id: 'member-existing',
+        pending_agreed_by_member_ids: ['member-existing'],
+        pending_target_week_start_date: '2026-07-06',
+      }),
     ]);
   });
 

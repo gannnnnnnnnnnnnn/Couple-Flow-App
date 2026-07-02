@@ -1,4 +1,4 @@
-export const APP_VERSION = '2026-07-01-pr13';
+export const APP_VERSION = '2026-07-02-pr14';
 export const UPDATE_NOTICE = '发现新版本，刷新后继续使用。';
 export const UPDATE_BUTTON_LABEL = '刷新到新版本';
 

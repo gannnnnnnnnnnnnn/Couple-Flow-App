@@ -48,16 +48,25 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Draw supports target week, budget filter, split 我的屏蔽 / 对方的屏蔽 sections, two per-member activity bans, eligible count, one persisted draw result, accept, 重抽, and 换一个.
 - Draw realtime applies shared changes quietly without changing the current screen, week, budget tab, visible result, or local form/draft state; if partner choice changes make a visible draw result stale, the draw screen shows `对方刚刚更新了选择，本轮抽签结果可能需要重新抽。`
 - An empty remote pair snapshot from shared clear is authoritative, so other connected devices do not preserve or re-upload stale local activities, draw sessions, plans, outcomes, or bans.
-- Draw sessions use a per-target-week active-round row with `idle`, `drawing`, `revealed`, `pending_accept`, `accepted`, `pending_reroll`, and `pending_change`; paired accept, 重抽, and 换一个 requests wait for both members before changing the result or creating the scheduled session.
+- Draw sessions use a per-target-week active-round row with `idle`, `drawing`, `revealed`, `pending_accept`, `accepted`, `pending_reroll`, and `pending_change`; paired accept, 重抽, and 换一个 requests wait for both effective members before changing the result or creating the scheduled session.
+- Paired agreement uses at most two effective V0 members, deduped by display name while preserving the current device member, so stale duplicate `pair_members` rows do not block draw or plan agreement.
+- Settings shows `检测到重复成员，已按当前两台设备处理同意流程。` when more than two raw pair members are present.
 - Accepted draw finalization creates or reuses one scheduled session, then resets the same target-week draw row to `idle` so the couple can draw another activity for that week immediately.
 - Supabase schema includes a partial unique index for draw-created scheduled sessions where `draw_session_id` is present, with a migration block that deduplicates existing rows first.
 - Ongoing plans support Done, Not done, Replace, and Redraw outcomes.
+- Week Board scheduled-session cards open a mobile-first `计划详情` bottom sheet with the activity title, budget, target week, status, todo, note, and state-specific actions.
+- Future planning sessions can move to this week, move to next week, redraw, replace, or cancel from the detail sheet.
+- Current-week sessions can be replaced, redrawn, marked not done, completed, or cancelled from the detail sheet.
+- Past open sessions can be completed, marked not done, replaced, or redrawn from the detail sheet.
+- In paired mode, scheduled-session plan-changing actions (`move_week`, `redraw`, `replace`, and `cancel`) persist pending agreement state on `scheduled_sessions`; the requester waits, the other member can agree or reject, and completion applies the action once.
+- Local/unpaired mode applies the same plan-changing actions immediately.
 - Critical state rule is represented in UI data flow: draw/accept creates a scheduled session, not history.
 - History renders only scheduled sessions with a `session_outcomes` record.
 
 ## Intended App Behavior
 
 - Week Board prioritizes Needs Review, then This Week, then Planning, and exposes outcome actions for reviewable sessions.
+- Week Board cards are actionable through the plan detail sheet without changing board bucket semantics.
 - Activity Pool supports budget tabs, local add form, and active/paused toggles.
 - Activity Pool delete removes unused activities and falls back to pause for referenced activities.
 - Draw Flow filters active eligible activities by budget, activity bans, target-week schedule, and previous-week completed/not-done outcomes.
@@ -68,8 +77,9 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 ## Validation
 
 - `npm ci` passed on 2026-07-01.
-- `npm test` passed on 2026-07-01: 12 files, 88 tests.
-- `npm run build` passed on 2026-07-01.
+- `npm test` passed on 2026-07-02: 13 files, 113 tests.
+- `npm run build` passed on 2026-07-02.
+- `git diff --check` passed on 2026-07-02.
 
 ## Known Gaps
 
@@ -78,5 +88,6 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Pair-code sync is not production-grade auth; no email auth or real invite security exists yet.
 - Remote deletes are action-scoped in V0: shared clear still clears all pair data, removed own weekly bans delete only the matching member-scoped row, and explicitly deleted unreferenced activities delete remotely while referenced activities pause.
 - Agreement enforcement is represented in UI state and the draw-created scheduled-session uniqueness guard, not full server-side member authorization.
+- This PR does not implement the CS2-style draw animation or a full UI/UX redesign.
 - Offline caching is conservative and network-first for app updates; richer offline runtime data caching is not tuned yet.
 - Pair-code sharing is copy-only; V0 intentionally does not include invitation management.

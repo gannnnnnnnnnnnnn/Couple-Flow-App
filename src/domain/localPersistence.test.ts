@@ -122,6 +122,41 @@ describe('local persistence', () => {
     expect(result.data.drawSessions).toEqual([]);
   });
 
+  it('normalizes scheduled session pending plan action fields', () => {
+    const storage = new MemoryStorage();
+    const data = createDemoLocalAppData();
+    storage.setItem(
+      LOCAL_STATE_STORAGE_KEY,
+      JSON.stringify({
+        version: 1,
+        savedAt: '2026-06-29T12:00:00.000Z',
+        data: {
+          ...data,
+          scheduledSessions: [
+            {
+              ...data.scheduledSessions[0],
+              pending_action_type: 'move_week',
+              pending_requested_by_member_id: 'member-g',
+              pending_agreed_by_member_ids: ['member-g', 42, ''],
+              pending_target_week_start_date: '2026-07-06',
+              pending_replacement_activity_id: 123,
+              pending_reason: 'x',
+            },
+          ],
+        },
+      }),
+    );
+
+    expect(loadLocalAppData(storage).data.scheduledSessions[0]).toMatchObject({
+      pending_action_type: 'move_week',
+      pending_requested_by_member_id: 'member-g',
+      pending_agreed_by_member_ids: ['member-g'],
+      pending_target_week_start_date: '2026-07-06',
+      pending_replacement_activity_id: null,
+      pending_reason: 'x',
+    });
+  });
+
   it('migrates old draft draw session status to idle', () => {
     const storage = new MemoryStorage();
     const data = createDemoLocalAppData();

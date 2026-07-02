@@ -33,6 +33,7 @@ export function SettingsScreen({
   planningCount,
   syncStatus,
   storageStatus,
+  duplicateMemberWarning,
   onCreatePair,
   onClearLocalData,
   onExportData,
@@ -58,6 +59,7 @@ export function SettingsScreen({
     source: LocalStateSource;
     savedAt: string | null;
   };
+  duplicateMemberWarning: boolean;
   onCreatePair: (displayName: string) => Promise<void>;
   onClearLocalData: () => void;
   onExportData: () => void;
@@ -174,6 +176,11 @@ export function SettingsScreen({
           <div className="rounded-md bg-cream px-3 py-3 text-sm text-ink/70">
             <p className="font-bold text-ink">{runtimeCopy.status}</p>
             <p className="mt-1 leading-5">{runtimeCopy.detail}</p>
+            {duplicateMemberWarning && (
+              <p className="mt-2 rounded-md bg-butter/45 px-3 py-2 text-xs font-bold text-ink">
+                检测到重复成员，已按当前两台设备处理同意流程。
+              </p>
+            )}
             {runtimeCopy.lastSaved && (
               <p className="mt-2 text-xs font-bold text-ink/60">{runtimeCopy.lastSaved}</p>
             )}

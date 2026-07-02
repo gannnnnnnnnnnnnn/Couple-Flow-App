@@ -11,6 +11,7 @@ import type {
   DrawSession,
   DrawSessionStatus,
   PendingDrawAction,
+  PendingPlanAction,
   ScheduledSession,
   SessionOutcome,
   WeeklyActivityBan,
@@ -34,6 +35,12 @@ const validPendingDrawActions = new Set<PendingDrawAction>([
   'accept',
   'reroll',
   'change',
+]);
+const validPendingPlanActions = new Set<PendingPlanAction>([
+  'move_week',
+  'redraw',
+  'replace',
+  'cancel',
 ]);
 
 export interface LocalAppData {
@@ -321,7 +328,7 @@ export function normalizeLocalAppData(data: Partial<LocalAppData> | unknown): Lo
   return {
     activities: safeArray(candidate.activities),
     drawSessions: safeArray(candidate.drawSessions).map(normalizeDrawSession),
-    scheduledSessions: safeArray(candidate.scheduledSessions),
+    scheduledSessions: safeArray(candidate.scheduledSessions).map(normalizeScheduledSession),
     outcomes: safeArray(candidate.outcomes),
     weeklyActivityBans: safeArray(candidate.weeklyActivityBans),
     targetWeekStart: isValidWeekStart(candidate.targetWeekStart)
@@ -332,6 +339,44 @@ export function normalizeLocalAppData(data: Partial<LocalAppData> | unknown): Lo
         ? candidate.budgetFilter
         : 'all',
   };
+}
+
+function normalizeScheduledSession(
+  scheduledSession: ScheduledSession | Record<string, unknown>,
+): ScheduledSession {
+  const pendingActionType = validPendingPlanActions.has(
+    scheduledSession.pending_action_type as PendingPlanAction,
+  )
+    ? (scheduledSession.pending_action_type as PendingPlanAction)
+    : null;
+  const pendingRequestedByMemberId =
+    pendingActionType && typeof scheduledSession.pending_requested_by_member_id === 'string'
+      ? scheduledSession.pending_requested_by_member_id
+      : null;
+
+  return {
+    ...scheduledSession,
+    pending_action_type: pendingActionType,
+    pending_requested_by_member_id: pendingRequestedByMemberId,
+    pending_agreed_by_member_ids:
+      pendingActionType && Array.isArray(scheduledSession.pending_agreed_by_member_ids)
+        ? scheduledSession.pending_agreed_by_member_ids.filter(
+            (memberId): memberId is string => typeof memberId === 'string' && !!memberId,
+          )
+        : [],
+    pending_target_week_start_date:
+      pendingActionType && isValidWeekStart(scheduledSession.pending_target_week_start_date)
+        ? scheduledSession.pending_target_week_start_date
+        : null,
+    pending_replacement_activity_id:
+      pendingActionType && typeof scheduledSession.pending_replacement_activity_id === 'string'
+        ? scheduledSession.pending_replacement_activity_id
+        : null,
+    pending_reason:
+      pendingActionType && typeof scheduledSession.pending_reason === 'string'
+        ? scheduledSession.pending_reason
+        : null,
+  } as ScheduledSession;
 }
 
 function safeArray<T>(value: T[] | undefined) {

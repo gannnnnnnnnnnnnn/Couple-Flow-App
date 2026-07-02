@@ -152,8 +152,41 @@ create table if not exists scheduled_sessions (
     status in ('planning', 'ongoing', 'needs_review', 'completed', 'not_done', 'replaced', 'redrawn')
   ),
   todo_text text not null default '',
+  pending_action_type text check (
+    pending_action_type is null or pending_action_type in ('move_week', 'redraw', 'replace', 'cancel')
+  ),
+  pending_requested_by_member_id text references pair_members(id) on delete set null,
+  pending_agreed_by_member_ids text[] not null default '{}',
+  pending_target_week_start_date date,
+  pending_replacement_activity_id text references activities(id) on delete set null,
+  pending_reason text,
   created_at timestamptz not null default now()
 );
+
+alter table scheduled_sessions
+  add column if not exists pending_action_type text;
+
+alter table scheduled_sessions
+  add column if not exists pending_requested_by_member_id text references pair_members(id) on delete set null;
+
+alter table scheduled_sessions
+  add column if not exists pending_agreed_by_member_ids text[] not null default '{}';
+
+alter table scheduled_sessions
+  add column if not exists pending_target_week_start_date date;
+
+alter table scheduled_sessions
+  add column if not exists pending_replacement_activity_id text references activities(id) on delete set null;
+
+alter table scheduled_sessions
+  add column if not exists pending_reason text;
+
+alter table scheduled_sessions drop constraint if exists scheduled_sessions_pending_action_type_check;
+
+alter table scheduled_sessions add constraint scheduled_sessions_pending_action_type_check
+  check (
+    pending_action_type is null or pending_action_type in ('move_week', 'redraw', 'replace', 'cancel')
+  );
 
 create table if not exists session_outcomes (
   id text primary key,

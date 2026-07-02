@@ -23,6 +23,7 @@ export type DrawSessionStatus =
   | 'pending_change';
 
 export type PendingDrawAction = 'accept' | 'reroll' | 'change';
+export type PendingPlanAction = 'move_week' | 'redraw' | 'replace' | 'cancel';
 
 export interface Pair {
   id: string;
@@ -90,6 +91,12 @@ export interface ScheduledSession {
   target_week_start_date: string;
   status: SessionStatus;
   todo_text: string;
+  pending_action_type: PendingPlanAction | null;
+  pending_requested_by_member_id: string | null;
+  pending_agreed_by_member_ids: string[];
+  pending_target_week_start_date: string | null;
+  pending_replacement_activity_id: string | null;
+  pending_reason: string | null;
   created_at: string;
 }
 
