@@ -24,11 +24,11 @@ The UI should feel like a couple's planning ritual: warm, fast to scan, and slig
 
 ## Screen Notes
 
-### Week Board
+### Plan
 
 - First screen after launch.
 - Shows This Week / Ongoing first.
-- Shows Planning below current week.
+- Shows later plans below current week.
 - Uses a small weekly rhythm for ongoing plans, future plans, and to-dos.
 - Makes outcome actions visible only for current sessions.
 

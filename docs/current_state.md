@@ -40,12 +40,12 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Supabase recovery fallback snapshots are blocked from autosave so local/demo/stale recovery data cannot overwrite remote pair data.
 - Pair-code join/create hydrates a complete repository snapshot before App autosave resumes, so joining a pair does not overwrite remote data with stale local demo data.
 - Normal Supabase autosave is debounced, suppresses identical realtime-applied snapshots, keeps remote-only rows unless there is an explicit UI delete hint, and scopes member-ban deletes by pair, draw session, member, and activity.
-- Week Board keeps past open sessions visible under Needs Review / Overdue until an outcome is recorded.
-- Replacing or redrawing from Needs Review reschedules follow-up work to the current week by default.
+- Plan keeps past open sessions visible under 待处理 until an outcome is recorded.
+- Replacing or redrawing from 待处理 reschedules follow-up work to the current week by default.
 - Activity Pool supports faster mobile entry with simple required fields, optional note/duration/tags, quick-add examples, clear-after-add, and lightweight success feedback.
 - Activity Pool supports editing title, budget group, note, duration, and tags, deleting explicitly removed unreferenced activities remotely, and pausing activities that are already referenced by plans, outcomes, or bans.
 - In paired mode, the acting member is locked to the stored device identity; local/demo mode keeps flexible member testing.
-- Draw supports target week, budget filter, split 我的屏蔽 / 对方的屏蔽 sections, two per-member activity bans, eligible count, one persisted draw result, accept, 重抽, and 换一个.
+- Draw supports target week, budget filter, one unified 本轮不想抽 ban list with ownership chips, two per-member activity bans, eligible count, one persisted draw result, accept, 重抽, and 换一个.
 - Draw realtime applies shared changes quietly without changing the current screen, week, budget tab, visible result, or local form/draft state; if partner choice changes make a visible draw result stale, the draw screen shows `对方刚刚更新了选择，本轮抽签结果可能需要重新抽。`
 - An empty remote pair snapshot from shared clear is authoritative, so other connected devices do not preserve or re-upload stale local activities, draw sessions, plans, outcomes, or bans.
 - Draw sessions use a per-target-week active-round row with `idle`, `drawing`, `revealed`, `pending_accept`, `accepted`, `pending_reroll`, and `pending_change`; paired accept, 重抽, and 换一个 requests wait for both effective members before changing the result or creating the scheduled session.
@@ -60,24 +60,28 @@ This is the local-first PWA draft with an optional first Supabase pair-sync laye
 - Past open sessions can be completed, marked not done, replaced, or redrawn from the detail sheet.
 - In paired mode, scheduled-session plan-changing actions (`move_week`, `redraw`, `replace`, and `cancel`) persist pending agreement state on `scheduled_sessions`; the requester waits, the other member can agree or reject, and completion applies the action once.
 - Local/unpaired mode applies the same plan-changing actions immediately.
+- Draw and plan paired actions use short entity-scoped local mutation guards so stale realtime snapshots cannot overwrite a just-clicked draw session or scheduled session while the local mutation is settling.
+- Bottom navigation shows unread-style badges for draw or plan decisions that require the current member's response.
+- Completion with rating creates a history outcome immediately and does not require paired agreement in V0.
+- Future improvement: per-member ratings/comments should use a separate table such as `session_reactions` so both people can record their own feeling.
 - Critical state rule is represented in UI data flow: draw/accept creates a scheduled session, not history.
 - History renders only scheduled sessions with a `session_outcomes` record.
 
 ## Intended App Behavior
 
-- Week Board prioritizes Needs Review, then This Week, then Planning, and exposes outcome actions for reviewable sessions.
-- Week Board cards are actionable through the plan detail sheet without changing board bucket semantics.
+- Plan prioritizes 本周, 之后, and 待处理 open sessions, and exposes outcome actions for reviewable sessions.
+- Plan cards are actionable through the plan detail sheet without changing board bucket semantics.
 - Activity Pool supports budget tabs, local add form, and active/paused toggles.
 - Activity Pool delete removes unused activities and falls back to pause for referenced activities.
 - Draw Flow filters active eligible activities by budget, activity bans, target-week schedule, and previous-week completed/not-done outcomes.
-- In paired mode, each device can edit only its own draw bans; partner bans are visible but read-only and update via realtime.
+- In paired mode, each device can edit only its own bans from the unified draw ban list; partner bans are visible as read-only ownership chips and update via realtime.
 - History renders only sessions with outcomes and groups them by week.
 - Settings exposes pair name, timezone, current week, local/sync status, visible connected pair-code details, local-safe reset/disconnect controls, and JSON backup import/export.
 
 ## Validation
 
 - `npm ci` passed on 2026-07-01.
-- `npm test` passed on 2026-07-02: 13 files, 113 tests.
+- `npm test` passed on 2026-07-02: 13 files, 116 tests.
 - `npm run build` passed on 2026-07-02.
 - `git diff --check` passed on 2026-07-02.
 

@@ -6,12 +6,14 @@ export function AppShell({
   activeScreen,
   children,
   members,
+  navBadges = {},
   onNavigate,
   pair,
 }: {
   activeScreen: Screen;
   children: ReactNode;
   members: PairMember[];
+  navBadges?: Partial<Record<Screen, number>>;
   onNavigate: (screen: Screen) => void;
   pair: Pair;
 }) {
@@ -58,7 +60,14 @@ export function AppShell({
                 onClick={() => onNavigate(item.id)}
                 title={item.label}
               >
-                <Icon size={19} strokeWidth={2.2} />
+                <span className="relative grid place-items-center">
+                  <Icon size={19} strokeWidth={2.2} />
+                  {Boolean(navBadges[item.id]) && (
+                    <span className="absolute -right-2 -top-2 grid h-4 min-w-4 place-items-center rounded-full bg-coral px-1 text-[0.62rem] font-black leading-none text-cream">
+                      {navBadges[item.id]! > 9 ? '9+' : navBadges[item.id]}
+                    </span>
+                  )}
+                </span>
                 <span className="truncate">{item.label}</span>
               </button>
             );

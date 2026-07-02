@@ -11,7 +11,7 @@ import type { ReactNode } from 'react';
 export type Screen = 'board' | 'pool' | 'draw' | 'history' | 'settings';
 
 export const navItems = [
-  { id: 'board', label: '本周', icon: Home },
+  { id: 'board', label: '计划', icon: Home },
   { id: 'pool', label: '活动池', icon: ListPlus },
   { id: 'draw', label: '抽签', icon: Sparkles },
   { id: 'history', label: '记录', icon: History },
