@@ -54,6 +54,12 @@ function scheduledSession(
     target_week_start_date: targetWeekStartDate,
     status: 'ongoing',
     todo_text: '',
+    pending_action_type: null,
+    pending_requested_by_member_id: null,
+    pending_agreed_by_member_ids: [],
+    pending_target_week_start_date: null,
+    pending_replacement_activity_id: null,
+    pending_reason: null,
     created_at: '',
   };
 }

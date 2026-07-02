@@ -687,6 +687,10 @@ function scopeDataForPair(
     scheduledSessions: data.scheduledSessions.map((session) => ({
       ...session,
       pair_id: identity.pairId,
+      pending_requested_by_member_id: session.pending_requested_by_member_id
+        ? safeMemberId(session.pending_requested_by_member_id)
+        : null,
+      pending_agreed_by_member_ids: session.pending_agreed_by_member_ids.map(safeMemberId),
     })),
     weeklyActivityBans: data.weeklyActivityBans.map((ban) => ({
       ...ban,

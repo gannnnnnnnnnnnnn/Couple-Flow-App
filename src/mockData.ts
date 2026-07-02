@@ -170,6 +170,23 @@ export const weeklyActivityBans: WeeklyActivityBan[] = [
   },
 ];
 
+const noPendingPlanAction = {
+  pending_action_type: null,
+  pending_requested_by_member_id: null,
+  pending_agreed_by_member_ids: [],
+  pending_target_week_start_date: null,
+  pending_replacement_activity_id: null,
+  pending_reason: null,
+} satisfies Pick<
+  ScheduledSession,
+  | 'pending_action_type'
+  | 'pending_requested_by_member_id'
+  | 'pending_agreed_by_member_ids'
+  | 'pending_target_week_start_date'
+  | 'pending_replacement_activity_id'
+  | 'pending_reason'
+>;
+
 export const scheduledSessions: ScheduledSession[] = [
   {
     id: 'session-current',
@@ -179,6 +196,7 @@ export const scheduledSessions: ScheduledSession[] = [
     target_week_start_date: '2026-06-29',
     status: 'ongoing',
     todo_text: '周四前先各自挑想吃的摊位',
+    ...noPendingPlanAction,
     created_at: '2026-06-22T00:00:00.000Z',
   },
   {
@@ -189,6 +207,7 @@ export const scheduledSessions: ScheduledSession[] = [
     target_week_start_date: '2026-07-06',
     status: 'planning',
     todo_text: '周日买好配菜',
+    ...noPendingPlanAction,
     created_at: '2026-06-23T00:00:00.000Z',
   },
   {
@@ -199,6 +218,7 @@ export const scheduledSessions: ScheduledSession[] = [
     target_week_start_date: '2026-06-22',
     status: 'needs_review',
     todo_text: '补一下街机夜到底成没成',
+    ...noPendingPlanAction,
     created_at: '2026-06-17T00:00:00.000Z',
   },
   {
@@ -209,6 +229,7 @@ export const scheduledSessions: ScheduledSession[] = [
     target_week_start_date: '2026-06-22',
     status: 'completed',
     todo_text: '试试杏仁可颂',
+    ...noPendingPlanAction,
     created_at: '2026-06-16T00:00:00.000Z',
   },
   {
@@ -219,6 +240,7 @@ export const scheduledSessions: ScheduledSession[] = [
     target_week_start_date: '2026-06-15',
     status: 'not_done',
     todo_text: '订两小时',
+    ...noPendingPlanAction,
     created_at: '2026-06-09T00:00:00.000Z',
   },
 ];

@@ -44,6 +44,11 @@
 - [x] Draw realtime applies shared changes without navigating, resetting the visible result, or jumping week/budget controls.
 - [x] Paired Draw accept, 重抽, and 换一个 requests require both members before creating a todo or replacing the current result.
 - [x] Paired Draw agreement actions disable immediately after tap and clear pending UI state after accept, rejection, reroll, or change completion.
+- [x] Paired agreement dedupes stale duplicate pair members and requires at most two effective V0 members.
+- [x] Week Board scheduled-session cards open a compact mobile-first `计划详情` action sheet.
+- [x] Future, current-week, and overdue open sessions expose only their state-appropriate plan actions.
+- [x] Paired plan-changing scheduled-session actions wait for both members before applying.
+- [x] Local/unpaired plan-changing scheduled-session actions apply immediately.
 - [x] JSON backup export/import exists for local mode with shape validation.
 - [x] No photos, maps, payments, or push notifications.
 
@@ -67,6 +72,7 @@
 - [x] Activity delete sync deletes unreferenced activities remotely and pauses referenced activities instead.
 - [x] Draw sessions carry a per-target-week active-round `idle` / `drawing` / `revealed` / `pending_accept` / `accepted` / `pending_reroll` / `pending_change` guard.
 - [x] Accepted draw-created scheduled sessions are idempotent by pair, draw session, activity, and target week, then reset the draw round to `idle`.
+- [x] Scheduled sessions carry nullable pending plan-action fields for `move_week`, `redraw`, `replace`, and `cancel` agreement.
 - [x] A target week can accept multiple different draw-created scheduled sessions; already accepted activities are excluded from that week's next draw pool.
 - [x] Supabase schema guards draw-created scheduled-session duplicates with a migration-safe partial unique index.
 - [x] Autosave is debounced and skips immediate saves after identical remote snapshots are applied.
