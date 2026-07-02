@@ -5,9 +5,9 @@
 - [x] Drawn activity is not rendered as History.
 - [x] Accepted draw creates a scheduled plan with `target_week_start_date`.
 - [x] Current week is computed from pair timezone.
-- [x] Future sessions render under Planning.
+- [x] Future sessions render under 之后.
 - [x] Current week sessions render under This Week / Ongoing.
-- [x] Past open sessions render under Needs Review / Overdue.
+- [x] Past open sessions render under 待处理.
 - [x] History contains only sessions with outcomes.
 
 ## V0 Scope
@@ -40,14 +40,16 @@
 - [x] Activity Pool supports faster mobile quick-add entry.
 - [x] Activity Pool supports editing, safe deletion, and pause fallback for referenced activities.
 - [x] Paired Draw locks the acting member to the stored device identity.
-- [x] Paired Draw renders 我的屏蔽 as editable and 对方的屏蔽 as read-only.
+- [x] Paired Draw renders one unified 本轮不想抽 list with only the current member's bans editable.
 - [x] Draw realtime applies shared changes without navigating, resetting the visible result, or jumping week/budget controls.
+- [x] Entity-scoped draw/session mutation guards prevent stale realtime snapshots from reverting just-clicked paired actions.
 - [x] Paired Draw accept, 重抽, and 换一个 requests require both members before creating a todo or replacing the current result.
 - [x] Paired Draw agreement actions disable immediately after tap and clear pending UI state after accept, rejection, reroll, or change completion.
 - [x] Paired agreement dedupes stale duplicate pair members and requires at most two effective V0 members.
 - [x] Week Board scheduled-session cards open a compact mobile-first `计划详情` action sheet.
 - [x] Future, current-week, and overdue open sessions expose only their state-appropriate plan actions.
 - [x] Paired plan-changing scheduled-session actions wait for both members before applying.
+- [x] Bottom navigation badges count only draw and plan decisions requiring the current member's response.
 - [x] Local/unpaired plan-changing scheduled-session actions apply immediately.
 - [x] JSON backup export/import exists for local mode with shape validation.
 - [x] No photos, maps, payments, or push notifications.

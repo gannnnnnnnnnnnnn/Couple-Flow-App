@@ -1,7 +1,7 @@
 import { CalendarDays, Check, Repeat2, Shuffle, X } from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   getPlanActionItems,
   getPlanActionLabel,
@@ -85,11 +85,11 @@ export function WeekBoard({
       <div className="rounded-md bg-ink p-5 text-cream shadow-soft">
         <div className="flex items-center justify-between gap-3">
           <div>
-            <p className="text-sm text-cream/70">本周看板</p>
-            <h2 className="mt-1 text-3xl font-black">{formatWeekLabel(currentWeekStart)}</h2>
+            <p className="text-sm text-cream/70">计划</p>
+            <h2 className="mt-1 text-3xl font-black">计划</h2>
             <p className="mt-2 text-sm text-cream/70">
               {needsReviewSessions.length
-                ? `${needsReviewSessions.length} 个过期计划待复盘`
+                ? `${needsReviewSessions.length} 个过期计划待处理`
                 : `${openPlanCount} 个进行中的计划`}
             </p>
           </div>
@@ -103,11 +103,11 @@ export function WeekBoard({
         activityById={activityById}
         budgetById={budgetById}
         currentWeekStart={currentWeekStart}
-        emptyBody="过期但还没结果的计划会留在这里，直到你们说清楚它后来怎样了。"
-        emptyTitle="都处理完啦"
+        emptyBody="过期但还没结果的计划会留在这里，直到补上完成、没做、换掉或重抽。"
+        emptyTitle="没有待处理计划"
         onOpen={setSelectedSessionId}
         sessions={needsReviewSessions}
-        title="待复盘"
+        title="待处理"
       />
 
       <PlanSection
@@ -147,7 +147,7 @@ export function WeekBoard({
         emptyTitle="下周还空着"
         onOpen={setSelectedSessionId}
         sessions={planningSessions}
-        title="计划中"
+        title="之后"
       />
 
       {selectedSession && selectedActivity && (
@@ -166,7 +166,9 @@ export function WeekBoard({
           onRejectPending={() => onRejectPendingPlanAction(selectedSession)}
           onSubmitAction={(command) => {
             onPlanAction(selectedSession, command);
-            closeSheet();
+            if (!pairedMode || command.type === 'complete' || command.type === 'not_done') {
+              closeSheet();
+            }
           }}
         />
       )}
@@ -239,10 +241,10 @@ function SessionCard({
 }) {
   const stateLabel =
     session.target_week_start_date < currentWeekStart
-      ? '待复盘'
+      ? '待处理'
       : session.target_week_start_date === currentWeekStart
         ? '本周'
-        : '计划中';
+        : '之后';
 
   return (
     <button
@@ -261,7 +263,7 @@ function SessionCard({
             <p className="mt-2 text-xs font-bold text-coral">等待双方确认</p>
           )}
         </div>
-        <Chip tone={stateLabel === '计划中' ? 'mint' : stateLabel === '待复盘' ? 'butter' : 'coral'}>
+        <Chip tone={stateLabel === '之后' ? 'mint' : stateLabel === '待处理' ? 'butter' : 'coral'}>
           {budgetById.get(activity.budget_group_id)?.name ?? '随意'}
         </Chip>
       </div>
@@ -311,6 +313,7 @@ function PlanDetailSheet({
   const [mode, setMode] = useState<'idle' | 'done' | 'missed' | 'replace'>('idle');
   const [reason, setReason] = useState('');
   const [replacementId, setReplacementId] = useState('');
+  const [pendingClickAction, setPendingClickAction] = useState<string | null>(null);
   const actions = getPlanActionItems(session, currentWeekStart);
   const replacements = activities.filter(
     (candidate) => candidate.status === 'active' && candidate.id !== activity.id,
@@ -322,6 +325,25 @@ function PlanDetailSheet({
   const currentMemberAgreed = session.pending_agreed_by_member_ids.includes(currentMemberId);
   const canRespondToPending =
     pairedMode && pendingAction && !pendingRequestedByMe && !currentMemberAgreed;
+  const actionButtonsDisabled = pendingClickAction !== null;
+
+  useEffect(() => {
+    setPendingClickAction(null);
+  }, [session.id, session.pending_action_type, session.pending_agreed_by_member_ids.length]);
+
+  function runGuardedAction(actionId: string, callback: () => void) {
+    if (pendingClickAction) {
+      return;
+    }
+
+    setPendingClickAction(actionId);
+    callback();
+    window.setTimeout(() => {
+      setPendingClickAction((currentAction) =>
+        currentAction === actionId ? null : currentAction,
+      );
+    }, 1200);
+  }
 
   function submitAction(actionId: PlanActionId) {
     const targetWeekStartDate = getTargetWeekForPlanAction(actionId, currentWeekStart);
@@ -403,16 +425,18 @@ function PlanDetailSheet({
                 <button
                   className="h-11 rounded-md bg-ink px-4 font-bold text-cream"
                   type="button"
-                  onClick={onAgreePending}
+                  disabled={actionButtonsDisabled}
+                  onClick={() => runGuardedAction('agree', onAgreePending)}
                 >
-                  同意
+                  {pendingClickAction === 'agree' ? '处理中' : '同意'}
                 </button>
                 <button
                   className="h-11 rounded-md bg-white px-4 font-bold text-ink/65"
                   type="button"
-                  onClick={onRejectPending}
+                  disabled={actionButtonsDisabled}
+                  onClick={() => runGuardedAction('reject', onRejectPending)}
                 >
-                  不同意
+                  {pendingClickAction === 'reject' ? '处理中' : '不同意'}
                 </button>
               </div>
             )}
@@ -424,7 +448,8 @@ function PlanDetailSheet({
                 key={action.id}
                 icon={iconForAction(action.id)}
                 label={action.label}
-                onClick={() => submitAction(action.id)}
+                disabled={actionButtonsDisabled}
+                onClick={() => runGuardedAction(action.id, () => submitAction(action.id))}
               />
             ))}
           </div>
@@ -437,7 +462,12 @@ function PlanDetailSheet({
                 key={rating}
                 className="rounded-md bg-butter/50 px-3 py-2 text-sm font-bold text-ink"
                 type="button"
-                onClick={() => onSubmitAction({ type: 'complete', rating })}
+                disabled={actionButtonsDisabled}
+                onClick={() =>
+                  runGuardedAction(`complete:${rating}`, () =>
+                    onSubmitAction({ type: 'complete', rating }),
+                  )
+                }
               >
                 {rating}
               </button>
@@ -457,7 +487,11 @@ function PlanDetailSheet({
               className="h-11 rounded-md bg-ink px-4 font-bold text-cream disabled:opacity-40"
               type="button"
               disabled={reason.trim().length < 3}
-              onClick={() => onSubmitAction({ type: 'not_done', reason: reason.trim() })}
+              onClick={() =>
+                runGuardedAction('not_done', () =>
+                  onSubmitAction({ type: 'not_done', reason: reason.trim() }),
+                )
+              }
             >
               记为没有做
             </button>
@@ -481,8 +515,12 @@ function PlanDetailSheet({
             <button
               className="h-11 rounded-md bg-ink px-4 font-bold text-cream disabled:opacity-40"
               type="button"
-              disabled={!replacementId}
-              onClick={() => onSubmitAction({ type: 'replace', replacementActivityId: replacementId })}
+              disabled={!replacementId || actionButtonsDisabled}
+              onClick={() =>
+                runGuardedAction('replace-submit', () =>
+                  onSubmitAction({ type: 'replace', replacementActivityId: replacementId }),
+                )
+              }
             >
               换一个活动
             </button>
@@ -503,10 +541,12 @@ function DetailItem({ label, value }: { label: string; value: string }) {
 }
 
 function ActionButton({
+  disabled = false,
   icon: Icon,
   label,
   onClick,
 }: {
+  disabled?: boolean;
   icon: LucideIcon;
   label: string;
   onClick: () => void;
@@ -515,6 +555,7 @@ function ActionButton({
     <button
       className="flex h-14 items-center justify-center gap-2 rounded-md bg-white text-sm font-black text-ink shadow-sm"
       type="button"
+      disabled={disabled}
       onClick={onClick}
     >
       <Icon size={17} />

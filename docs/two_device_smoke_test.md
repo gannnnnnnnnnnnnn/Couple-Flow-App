@@ -17,8 +17,8 @@ Use this after Supabase is configured and the same build/env is available on bot
 11. Device B adds an activity in Activity Pool.
 12. Device A sees the activity.
 13. Device A draws for next week and accepts a scheduled session.
-14. Device B sees the scheduled session under Planning.
-15. Device B marks an outcome from This Week or Needs Review.
+14. Device B sees the scheduled session under Plan / later plans.
+15. Device B marks an outcome from This Week or Pending.
 16. Device A sees the outcome in History.
 17. Device B disconnects this device from Settings.
 18. Device A confirms the remote pair data remains available.

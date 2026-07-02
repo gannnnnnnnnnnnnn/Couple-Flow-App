@@ -90,7 +90,7 @@ export function getPlanStatusLabel(
   }
 
   if (session.target_week_start_date < currentWeekStart) {
-    return '待复盘';
+    return '待处理';
   }
 
   if (session.target_week_start_date === currentWeekStart) {

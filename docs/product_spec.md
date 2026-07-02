@@ -47,14 +47,14 @@ History is created only when a scheduled session receives one of these outcomes:
 - Store target week as `target_week_start_date`.
 - Do not store or depend on week numbers.
 - Compute current week from pair timezone.
-- Future sessions show under Planning.
+- Future sessions show under Plan / later plans.
 - Current week sessions show under This Week / Ongoing.
-- Past open sessions with no outcome show under Needs Review / Overdue.
+- Past open sessions with no outcome show under Pending.
 - Archived outcomes show under History.
 
 ## V0 Screens
 
-### Week Board
+### Plan
 
 Shows the current week, ongoing sessions, future planning, and scheduled to-dos. Unavailable-time slots stay out of V0.
 

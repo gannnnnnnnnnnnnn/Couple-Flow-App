@@ -146,4 +146,86 @@ describe('realtime snapshot merging', () => {
       }),
     );
   });
+
+  it('does not let a stale remote snapshot revert a just-clicked pending draw action', () => {
+    const localData = createEmptyLocalAppData();
+    localData.drawSessions = [
+      {
+        id: 'draw-1',
+        pair_id: 'pair-1',
+        target_week_start_date: '2026-07-06',
+        created_by_member_id: 'member-me',
+        status: 'pending_reroll',
+        result_activity_id: 'activity-1',
+        pending_action_type: 'reroll',
+        requested_by_member_id: 'member-me',
+        agreed_by_member_ids: ['member-me'],
+        created_at: '',
+      },
+    ];
+    const remoteData = createEmptyLocalAppData();
+    remoteData.drawSessions = [
+      {
+        ...localData.drawSessions[0],
+        status: 'revealed',
+        pending_action_type: null,
+        requested_by_member_id: null,
+        agreed_by_member_ids: [],
+      },
+    ];
+
+    const merged = mergeRealtimeSnapshotData({
+      actingMemberId: 'member-me',
+      localData,
+      pendingActivityDeleteIds: new Set(),
+      pendingDrawSessionIds: new Set(['draw-1']),
+      preserveDeviceUi: true,
+      remoteData,
+    });
+
+    expect(merged.drawSessions[0]).toEqual(localData.drawSessions[0]);
+  });
+
+  it('does not let a stale remote snapshot revert a just-clicked pending plan action', () => {
+    const localData = createEmptyLocalAppData();
+    localData.scheduledSessions = [
+      {
+        id: 'session-1',
+        pair_id: 'pair-1',
+        activity_id: 'activity-1',
+        draw_session_id: 'draw-1',
+        target_week_start_date: '2026-07-06',
+        status: 'planning',
+        todo_text: '',
+        pending_action_type: 'cancel',
+        pending_requested_by_member_id: 'member-me',
+        pending_agreed_by_member_ids: ['member-me'],
+        pending_target_week_start_date: null,
+        pending_replacement_activity_id: null,
+        pending_reason: '计划取消',
+        created_at: '',
+      },
+    ];
+    const remoteData = createEmptyLocalAppData();
+    remoteData.scheduledSessions = [
+      {
+        ...localData.scheduledSessions[0],
+        pending_action_type: null,
+        pending_requested_by_member_id: null,
+        pending_agreed_by_member_ids: [],
+        pending_reason: null,
+      },
+    ];
+
+    const merged = mergeRealtimeSnapshotData({
+      actingMemberId: 'member-me',
+      localData,
+      pendingActivityDeleteIds: new Set(),
+      pendingScheduledSessionIds: new Set(['session-1']),
+      preserveDeviceUi: true,
+      remoteData,
+    });
+
+    expect(merged.scheduledSessions[0]).toEqual(localData.scheduledSessions[0]);
+  });
 });

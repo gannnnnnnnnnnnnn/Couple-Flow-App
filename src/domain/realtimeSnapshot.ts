@@ -15,12 +15,16 @@ export function isAuthoritativeSharedClear(data: LocalAppData) {
 export function mergeRealtimeSnapshotData({
   actingMemberId,
   localData,
+  pendingDrawSessionIds = new Set(),
+  pendingScheduledSessionIds = new Set(),
   pendingActivityDeleteIds,
   preserveDeviceUi,
   remoteData,
 }: {
   actingMemberId: string | null;
   localData: LocalAppData;
+  pendingDrawSessionIds?: Set<string>;
+  pendingScheduledSessionIds?: Set<string>;
   pendingActivityDeleteIds: Set<string>;
   preserveDeviceUi: boolean;
   remoteData: LocalAppData;
@@ -48,10 +52,12 @@ export function mergeRealtimeSnapshotData({
       localData.drawSessions,
       remoteData.drawSessions,
       actingMemberId,
+      pendingDrawSessionIds,
     ),
-    scheduledSessions: mergeLocalRowsById(
+    scheduledSessions: mergeScheduledSessionsForRealtime(
       localData.scheduledSessions,
       remoteData.scheduledSessions,
+      pendingScheduledSessionIds,
     ),
     outcomes: mergeLocalRowsById(localData.outcomes, remoteData.outcomes),
     weeklyActivityBans: mergeRemoteBansForPairedDevice(
@@ -90,10 +96,16 @@ function mergeDrawSessionsForRealtime(
   localDrawSessions: DrawSession[],
   remoteDrawSessions: DrawSession[],
   actingMemberId: string,
+  pendingDrawSessionIds: Set<string>,
 ) {
   const merged = new Map(remoteDrawSessions.map((drawSession) => [drawSession.id, drawSession]));
 
   localDrawSessions.forEach((drawSession) => {
+    if (pendingDrawSessionIds.has(drawSession.id)) {
+      merged.set(drawSession.id, drawSession);
+      return;
+    }
+
     if (
       drawSession.created_by_member_id === actingMemberId &&
       !merged.has(drawSession.id)
@@ -102,6 +114,25 @@ function mergeDrawSessionsForRealtime(
     }
   });
 
+  return [...merged.values()];
+}
+
+function mergeScheduledSessionsForRealtime(
+  localScheduledSessions: ScheduledSession[],
+  remoteScheduledSessions: ScheduledSession[],
+  pendingScheduledSessionIds: Set<string>,
+) {
+  const merged = new Map(remoteScheduledSessions.map((session) => [session.id, session]));
+  localScheduledSessions.forEach((session) => {
+    if (pendingScheduledSessionIds.has(session.id)) {
+      merged.set(session.id, session);
+      return;
+    }
+
+    if (!merged.has(session.id)) {
+      merged.set(session.id, session);
+    }
+  });
   return [...merged.values()];
 }
 

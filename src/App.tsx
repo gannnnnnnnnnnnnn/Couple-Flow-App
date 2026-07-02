@@ -169,6 +169,8 @@ function App() {
   const [planNotice, setPlanNotice] = useState<string | null>(null);
   const pendingDrawMutationKeyRef = useRef<string | null>(null);
   const pendingPlanMutationKeyRef = useRef<string | null>(null);
+  const guardedDrawSessionIdsRef = useRef(new Set<string>());
+  const guardedScheduledSessionIdsRef = useRef(new Set<string>());
 
   const currentWeekStart = useMemo(
     () => getWeekStartDate(new Date(), activePair.timezone),
@@ -223,6 +225,26 @@ function App() {
   const pairedAgreementMemberIds = effectivePairedAgreementMembers.map((member) => member.id);
   const requiresPairedAgreement = !!pairIdentity && pairedAgreementMemberIds.length > 1;
   const hasDuplicateMemberWarning = !!pairIdentity && hasExtraRawPairMembers(activeMembers);
+  const drawDecisionCount = useMemo(
+    () =>
+      drawSessions.filter(
+        (drawSession) =>
+          drawSession.status.startsWith('pending_') &&
+          drawSession.requested_by_member_id !== activeMemberId &&
+          !drawSession.agreed_by_member_ids.includes(activeMemberId),
+      ).length,
+    [activeMemberId, drawSessions],
+  );
+  const planDecisionCount = useMemo(
+    () =>
+      scheduledSessions.filter(
+        (session) =>
+          !!session.pending_action_type &&
+          session.pending_requested_by_member_id !== activeMemberId &&
+          !session.pending_agreed_by_member_ids.includes(activeMemberId),
+      ).length,
+    [activeMemberId, scheduledSessions],
+  );
 
   latestUiRef.current = {
     targetWeekStart: selectedTargetWeek,
@@ -258,12 +280,17 @@ function App() {
     const appliedData = mergeRealtimeSnapshotData({
       actingMemberId: snapshot.identity?.memberId ?? null,
       localData: currentLocalData,
+      pendingDrawSessionIds: guardedDrawSessionIdsRef.current,
+      pendingScheduledSessionIds: guardedScheduledSessionIdsRef.current,
       pendingActivityDeleteIds,
       preserveDeviceUi,
       remoteData: snapshot.data,
     });
+    const hasGuardedEntityMerges =
+      guardedDrawSessionIdsRef.current.size > 0 ||
+      guardedScheduledSessionIdsRef.current.size > 0;
 
-    if (suppressAutosave) {
+    if (suppressAutosave && !hasGuardedEntityMerges) {
       const fingerprint = getLocalAppDataFingerprint(appliedData);
       remoteSnapshotFingerprintRef.current = fingerprint;
       lastSavedFingerprintRef.current = fingerprint;
@@ -755,6 +782,7 @@ function App() {
   }
 
   function acceptDraw(activity: Activity) {
+    guardDrawSession(currentDrawSessionId);
     if (requiresPairedAgreement) {
       requestPendingDrawAction('accept');
       return;
@@ -767,6 +795,7 @@ function App() {
 
   function requestPendingDrawAction(actionType: PendingDrawAction) {
     runDrawMutationOnce(`request:${actionType}:${currentDrawSessionId}`, () => {
+      guardDrawSession(currentDrawSessionId);
       const drawSession = currentDrawSession;
       const resultActivityId = drawSession?.result_activity_id ?? null;
       if (!canRequestDrawAction(drawSession) || !resultActivityId) {
@@ -790,12 +819,13 @@ function App() {
           actionType,
         }),
       );
-      setDrawNotice(null);
+      setDrawNotice('已发送，等待对方确认');
     });
   }
 
   function agreePendingDrawAction() {
     runDrawMutationOnce(`agree:${currentDrawSessionId}`, () => {
+      guardDrawSession(currentDrawSessionId);
       const result = agreeToPendingDrawAction({
         drawSessions,
         pairId: activePairId,
@@ -807,6 +837,7 @@ function App() {
 
       if (result.completedAction === 'accept' && currentDrawResult) {
         finalizeAcceptedDraw(currentDrawResult, result.drawSessions);
+        setDrawNotice('双方已同意，已更新');
         return;
       }
 
@@ -826,15 +857,18 @@ function App() {
               })
             : result.drawSessions,
         );
+        setDrawNotice(replacement ? '双方已同意，已更新' : '已同意，等待对方');
         return;
       }
 
       setDrawSessions(result.drawSessions);
+      setDrawNotice('已同意，等待对方');
     });
   }
 
   function rejectPendingDraw() {
     runDrawMutationOnce(`reject:${currentDrawSessionId}`, () => {
+      guardDrawSession(currentDrawSessionId);
       setDrawSessions(
         rejectPendingDrawAction({
           drawSessions,
@@ -844,7 +878,7 @@ function App() {
           actingMemberId: activeMemberId,
         }),
       );
-      setDrawNotice(null);
+      setDrawNotice('已拒绝，本次操作已取消');
     });
   }
 
@@ -886,6 +920,21 @@ function App() {
     }, 450);
   }
 
+  function guardDrawSession(drawSessionId: string) {
+    guardEntityId(guardedDrawSessionIdsRef.current, drawSessionId);
+  }
+
+  function guardScheduledSession(sessionId: string) {
+    guardEntityId(guardedScheduledSessionIdsRef.current, sessionId);
+  }
+
+  function guardEntityId(guardedIds: Set<string>, entityId: string) {
+    guardedIds.add(entityId);
+    window.setTimeout(() => {
+      guardedIds.delete(entityId);
+    }, 3500);
+  }
+
   function drawReplacementResult(currentActivityId: string | null) {
     const eligibleActivities = getEligibleActivities({
       activities,
@@ -913,7 +962,7 @@ function App() {
       ...currentOutcomes,
       createOutcome(session, 'completed', { rating }),
     ]);
-    setPlanNotice('计划已更新');
+    setPlanNotice('已记录，已进入历史');
   }
 
   function missSession(session: ScheduledSession, reason: string) {
@@ -921,7 +970,7 @@ function App() {
       ...currentOutcomes,
       createOutcome(session, 'not_done', { reason }),
     ]);
-    setPlanNotice('计划已更新');
+    setPlanNotice('已记录，已进入历史');
   }
 
   function handlePlanAction(session: ScheduledSession, command: PlanActionCommand) {
@@ -941,6 +990,7 @@ function App() {
     }
 
     runPlanMutationOnce(`plan-request:${session.id}:${command.type}`, () => {
+      guardScheduledSession(session.id);
       if (requiresPairedAgreement) {
         setScheduledSessions(
           requestPendingPlanAction({
@@ -955,16 +1005,17 @@ function App() {
             },
           }),
         );
-        setPlanNotice('等待对方同意');
+        setPlanNotice('已发送，等待对方确认');
         return;
       }
 
-      applyPlanAction(action);
+      applyPlanAction(action, scheduledSessions, outcomes, false);
     });
   }
 
   function agreePendingPlanAction(session: ScheduledSession) {
     runPlanMutationOnce(`plan-agree:${session.id}:${session.pending_action_type}`, () => {
+      guardScheduledSession(session.id);
       const result = agreeToPendingPlanAction({
         scheduledSessions,
         sessionId: session.id,
@@ -974,21 +1025,23 @@ function App() {
 
       setScheduledSessions(result.scheduledSessions);
       if (result.completedAction) {
-        applyPlanAction(result.completedAction, result.scheduledSessions, outcomes);
+        applyPlanAction(result.completedAction, result.scheduledSessions, outcomes, true);
       } else {
-        setPlanNotice('等待对方同意');
+        setPlanNotice('已同意，等待对方');
       }
     });
   }
 
   function rejectPendingPlan(session: ScheduledSession) {
     runPlanMutationOnce(`plan-reject:${session.id}:${session.pending_action_type}`, () => {
+      guardScheduledSession(session.id);
       setScheduledSessions(
         rejectPendingPlanAction({
           scheduledSessions,
           sessionId: session.id,
         }),
       );
+      setPlanNotice('已拒绝，本次操作已取消');
     });
   }
 
@@ -1019,6 +1072,7 @@ function App() {
     action: CompletedPlanAction,
     sourceScheduledSessions = scheduledSessions,
     sourceOutcomes = outcomes,
+    completedByAgreement = requiresPairedAgreement,
   ) {
     const result = applyCompletedPlanAction({
       action,
@@ -1039,7 +1093,13 @@ function App() {
       return;
     }
 
-    setPlanNotice(action.type === 'cancel' ? '计划已取消' : '计划已更新');
+    setPlanNotice(
+      action.type === 'cancel'
+        ? '计划已取消'
+        : completedByAgreement
+          ? '双方已同意，已更新'
+          : '计划已更新',
+    );
   }
 
   function runPlanMutationOnce(key: string, mutation: () => void) {
@@ -1104,6 +1164,7 @@ function App() {
     <AppShell
       activeScreen={activeScreen}
       members={visibleMembers}
+      navBadges={{ board: planDecisionCount, draw: drawDecisionCount }}
       onNavigate={setActiveScreen}
       pair={activePair}
     >

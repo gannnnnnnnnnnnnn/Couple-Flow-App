@@ -1,5 +1,5 @@
 import { Sparkles } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { drawOneActivity, getEligibleActivities } from '../domain/draw';
 import { formatWeekLabel } from '../domain/week';
 import type {
@@ -207,41 +207,17 @@ export function DrawScreen({
       </div>
 
       <div className="space-y-3">
-        {members
-          .filter((member) => !pairedMode || member.id === currentMemberId)
-          .map((member) => (
-            <BanPanel
-              key={member.id}
-              activities={bannableActivities}
-              bans={bans}
-              budgetLabel={
-                budgetFilter === 'all' ? '全部预算' : budgetById.get(budgetFilter)?.name ?? '预算'
-              }
-              drawSessionId={drawSessionId}
-              editable
-              member={member}
-              title={pairedMode ? '我的屏蔽' : `${member.display_name} 这轮不想抽到`}
-              onToggleBan={onToggleBan}
-            />
-          ))}
-        {pairedMode &&
-          members
-            .filter((member) => member.id !== currentMemberId)
-            .map((member) => (
-              <BanPanel
-                key={member.id}
-                activities={bannableActivities}
-                bans={bans}
-                budgetLabel={
-                  budgetFilter === 'all' ? '全部预算' : budgetById.get(budgetFilter)?.name ?? '预算'
-                }
-                drawSessionId={drawSessionId}
-                editable={false}
-                member={member}
-                title="对方的屏蔽"
-                onToggleBan={onToggleBan}
-              />
-            ))}
+        <UnifiedBanPanel
+          activities={bannableActivities}
+          bans={bans}
+          budgetLabel={
+            budgetFilter === 'all' ? '全部预算' : budgetById.get(budgetFilter)?.name ?? '预算'
+          }
+          currentMemberId={currentMemberId}
+          drawSessionId={drawSessionId}
+          members={members}
+          onToggleBan={onToggleBan}
+        />
       </div>
 
       <div className="rounded-md bg-white/80 p-4 shadow-sm">
@@ -368,37 +344,41 @@ export function DrawScreen({
   );
 }
 
-function BanPanel({
+function UnifiedBanPanel({
   activities,
   bans,
   budgetLabel,
+  currentMemberId,
   drawSessionId,
-  editable,
-  member,
-  title,
+  members,
   onToggleBan,
 }: {
   activities: Activity[];
   bans: WeeklyActivityBan[];
   budgetLabel: string;
+  currentMemberId: string;
   drawSessionId: string;
-  editable: boolean;
-  member: PairMember;
-  title: string;
+  members: PairMember[];
   onToggleBan: (memberId: string, activityId: string) => void;
 }) {
-  const memberBans = bans.filter(
-    (ban) => ban.draw_session_id === drawSessionId && ban.member_id === member.id,
-  );
+  const drawBans = bans.filter((ban) => ban.draw_session_id === drawSessionId);
+  const ownBans = drawBans.filter((ban) => ban.member_id === currentMemberId);
+  const remainingOwnBans = Math.max(0, 2 - ownBans.length);
+  const memberById = new Map(members.map((member) => [member.id, member]));
+  const partnerMemberIds = members
+    .map((member) => member.id)
+    .filter((memberId) => memberId !== currentMemberId);
 
   return (
     <div className="rounded-md bg-white/80 p-4 shadow-sm">
-      <div className="mb-3 flex items-center justify-between">
+      <div className="mb-3 flex items-center justify-between gap-3">
         <div>
-          <p className="font-black text-ink">{title}</p>
+          <p className="font-black text-ink">本轮不想抽</p>
           <p className="text-xs font-semibold text-ink/50">{budgetLabel}</p>
         </div>
-        <Chip tone={memberBans.length === 2 ? 'coral' : 'butter'}>{memberBans.length}/2</Chip>
+        <Chip tone={remainingOwnBans === 0 ? 'coral' : 'butter'}>
+          你本轮还能屏蔽 {remainingOwnBans} 个
+        </Chip>
       </div>
       <div className="grid gap-2">
         {activities.length === 0 && (
@@ -407,28 +387,71 @@ function BanPanel({
           </p>
         )}
         {activities.map((activity) => {
-          const isBanned = memberBans.some((ban) => ban.activity_id === activity.id);
-          const disabled = !editable || (!isBanned && memberBans.length >= 2);
+          const ownBanned = ownBans.some((ban) => ban.activity_id === activity.id);
+          const partnerBanMemberIds = partnerMemberIds.filter((memberId) =>
+            drawBans.some(
+              (ban) => ban.member_id === memberId && ban.activity_id === activity.id,
+            ),
+          );
+          const partnerBanned = partnerBanMemberIds.length > 0;
+          const disabled = !ownBanned && ownBans.length >= 2;
+
           return (
             <button
               key={activity.id}
-              className={`flex min-h-11 items-center justify-between rounded-md px-3 text-left text-sm font-bold ${
-                isBanned
+              className={`min-h-[3.25rem] rounded-md px-3 py-2 text-left text-sm font-bold ${
+                ownBanned
                   ? 'bg-coral text-cream'
                   : disabled
                     ? 'bg-cream text-ink/35'
-                    : 'bg-cream text-ink/70'
+                    : 'bg-cream text-ink/72'
               }`}
               type="button"
               disabled={disabled}
-              onClick={() => onToggleBan(member.id, activity.id)}
+              onClick={() => onToggleBan(currentMemberId, activity.id)}
             >
-              <span>{activity.title}</span>
-              {isBanned && <span>{editable ? '已屏蔽' : '对方已屏蔽'}</span>}
+              <span className="flex items-center justify-between gap-3">
+                <span>{activity.title}</span>
+              </span>
+              {(ownBanned || partnerBanned) && (
+                <span className="mt-2 flex flex-wrap gap-1.5">
+                  {ownBanned && partnerBanned && (
+                    <BanChip tone={ownBanned ? 'light' : 'soft'}>双方都屏蔽</BanChip>
+                  )}
+                  {ownBanned && !partnerBanned && <BanChip tone="light">我已屏蔽</BanChip>}
+                  {partnerBanned && !ownBanned && (
+                    <BanChip tone="soft">
+                      {partnerBanMemberIds
+                        .map((memberId) => memberById.get(memberId)?.display_name)
+                        .filter(Boolean)
+                        .join('、') || '对方'}
+                      已屏蔽
+                    </BanChip>
+                  )}
+                </span>
+              )}
             </button>
           );
         })}
       </div>
     </div>
+  );
+}
+
+function BanChip({
+  children,
+  tone,
+}: {
+  children: ReactNode;
+  tone: 'light' | 'soft';
+}) {
+  return (
+    <span
+      className={`rounded-md px-2 py-0.5 text-[0.68rem] font-black ${
+        tone === 'light' ? 'bg-cream/25 text-current' : 'bg-white/70 text-ink/62'
+      }`}
+    >
+      {children}
+    </span>
   );
 }
