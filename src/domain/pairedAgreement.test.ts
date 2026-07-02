@@ -94,6 +94,40 @@ describe('effective paired agreement members', () => {
     ).toEqual(['member-partner', 'member-me-current']);
   });
 
+  it('keeps the current device member when capping three unique raw members', () => {
+    const rawMembers: PairMember[] = [
+      {
+        id: 'member-stale-a',
+        pair_id: 'pair-1',
+        display_name: 'Old A',
+        color: '#f97362',
+        created_at: '2026-06-29T00:00:00.000Z',
+      },
+      {
+        id: 'member-partner',
+        pair_id: 'pair-1',
+        display_name: 'Partner',
+        color: '#7ad7bd',
+        created_at: '2026-06-29T00:01:00.000Z',
+      },
+      {
+        id: 'member-me-current',
+        pair_id: 'pair-1',
+        display_name: 'Me',
+        color: '#f97362',
+        created_at: '2026-06-29T00:02:00.000Z',
+      },
+    ];
+
+    const effectiveMembers = getEffectivePairedAgreementMembers(
+      rawMembers,
+      'member-me-current',
+    );
+
+    expect(effectiveMembers).toHaveLength(2);
+    expect(effectiveMembers.map((member) => member.id)).toContain('member-me-current');
+  });
+
   it('stale duplicate member does not block accept agreement', () => {
     const requiredMemberIds = getEffectivePairedAgreementMembers(
       rawMembersWithStaleDuplicate,

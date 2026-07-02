@@ -211,6 +211,7 @@ function App() {
     () => getEffectivePairedAgreementMembers(activeMembers, activeMemberId),
     [activeMemberId, activeMembers],
   );
+  const visibleMembers = pairIdentity ? effectivePairedAgreementMembers : activeMembers;
   const currentDrawSessionId = getDrawSessionId(activePairId, selectedTargetWeek);
   const currentDrawSession = getDrawSessionForWeek(drawSessions, selectedTargetWeek);
   const currentDrawResult = currentDrawSession?.result_activity_id
@@ -1102,7 +1103,7 @@ function App() {
   return (
     <AppShell
       activeScreen={activeScreen}
-      members={activeMembers}
+      members={visibleMembers}
       onNavigate={setActiveScreen}
       pair={activePair}
     >
@@ -1144,7 +1145,7 @@ function App() {
           budgetById={budgetById}
           currentMemberId={activeMemberId}
           currentWeekStart={currentWeekStart}
-          members={activeMembers}
+          members={visibleMembers}
           needsReviewSessions={needsReviewSessions}
           ongoingSessions={ongoingSessions}
           outcomes={outcomes}
@@ -1163,7 +1164,7 @@ function App() {
           budgetById={budgetById}
           currentWeekStart={currentWeekStart}
           nextWeekStart={nextWeekStart}
-          members={activeMembers}
+          members={visibleMembers}
           scheduledSessions={scheduledSessions}
           outcomes={outcomes}
           bans={bans}
